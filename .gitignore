@@ -1,0 +1,28 @@
+# Maven and Java build output
+/target/
+/build/
+/out/
+*.class
+*.jar
+*.war
+*.ear
+*.exec
+
+# IDE and editor settings
+/.idea/
+*.iml
+/.project
+/.classpath
+/.settings/
+/.vscode/
+
+# Local environment and runtime files
+.env
+.env.*
+!.env.example
+src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+*.log
+*.log.*
+*.pid
+*.tmp

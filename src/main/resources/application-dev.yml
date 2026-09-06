@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: ${CHAT_DB_URL:jdbc:postgresql://192.168.186.131:5432/postgres}
+    username: ${CHAT_DB_USERNAME:postgres}
+    password: ${CHAT_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${CHAT_DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${CHAT_DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${CHAT_DB_CONNECTION_TIMEOUT_MS:3000}
+  data:
+    redis:
+      host: ${CHAT_REDIS_HOST:localhost}
+      port: ${CHAT_REDIS_PORT:6379}
+      password: ${CHAT_REDIS_PASSWORD:}
+      connect-timeout: ${CHAT_REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${CHAT_REDIS_TIMEOUT:2s}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    # The supplied development database already contains V1-V4 objects and seed data.
+    # A non-empty existing schema is recorded at this version; a fresh schema still runs all migrations.
+    baseline-version: 4
+    baseline-description: Existing schema before Flyway adoption
+
+chat:
+  redis:
+    enabled: ${CHAT_REDIS_ENABLED:true}
+    room-info-ttl: ${CHAT_REDIS_ROOM_INFO_TTL:PT5M}
+    online-user-ttl: ${CHAT_REDIS_ONLINE_USER_TTL:PT70S}
+    rate-window: ${CHAT_REDIS_RATE_WINDOW:PT1M}
+    messages-per-second: ${CHAT_REDIS_MESSAGES_PER_SECOND:2}
+    messages-per-minute: ${CHAT_REDIS_MESSAGES_PER_MINUTE:20}
+    review-recovery-interval: ${CHAT_REDIS_REVIEW_RECOVERY_INTERVAL:PT30S}
+    review-scan-batch-size: ${CHAT_REDIS_REVIEW_SCAN_BATCH_SIZE:100}
+  security:
+    jwt:
+      issuer: multi-room-chat
+      secret: ${CHAT_JWT_SECRET:bXVsdGktcm9vbS1jaGF0LWxvY2FsLWRldi1zaWduaW5nLWtleS0xMjM0NTY=}
+      access-token-ttl: ${CHAT_JWT_ACCESS_TOKEN_TTL:PT30M}
+  review:
+    timeout: ${CHAT_REVIEW_TIMEOUT:PT30S}
+    scan-interval: ${CHAT_REVIEW_SCAN_INTERVAL:PT1S}
+  websocket:
+    allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:5173}

@@ -1,0 +1,37 @@
+-- PostgreSQL 14+; migrations are intended to be executed in lexical order.
+-- timestamptz values are stored as UTC instants by PostgreSQL.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TYPE user_role AS ENUM ('USER', 'ROOM_ADMIN', 'SYSTEM_ADMIN');
+CREATE TYPE user_status AS ENUM ('ACTIVE', 'DISABLED');
+CREATE TYPE room_status AS ENUM ('ACTIVE', 'PAUSED', 'CLOSED');
+CREATE TYPE room_join_mode AS ENUM ('OPEN', 'APPROVAL');
+CREATE TYPE membership_status AS ENUM ('PENDING', 'ACTIVE', 'REJECTED', 'EXITED');
+CREATE TYPE message_type AS ENUM ('CHAT', 'ADMIN_MESSAGE', 'SYSTEM_NOTIFICATION');
+CREATE TYPE message_status AS ENUM (
+    'PENDING_REVIEW',
+    'APPROVED',
+    'REJECTED',
+    'TIMEOUT',
+    'PUBLISHED',
+    'CANCELLED_BY_ROOM_DELETION'
+);
+CREATE TYPE audit_action AS ENUM (
+    'LOGIN',
+    'JOIN_ROOM',
+    'LEAVE_ROOM',
+    'JOIN_APPROVE',
+    'JOIN_REJECT',
+    'MESSAGE_SUBMIT',
+    'MESSAGE_APPROVE',
+    'MESSAGE_REJECT',
+    'MESSAGE_TIMEOUT',
+    'ROOM_CREATE',
+    'ROOM_UPDATE',
+    'ROOM_DELETE',
+    'ADMIN_BROADCAST',
+    'EMERGENCY_PUBLISH',
+    'ADMIN_ROOM_PERMISSION_GRANT',
+    'ADMIN_ROOM_PERMISSION_REVOKE'
+);
+CREATE TYPE audit_resource_type AS ENUM ('USER', 'CHAT_ROOM', 'MEMBERSHIP', 'MESSAGE', 'ADMIN_ROOM_PERMISSION');

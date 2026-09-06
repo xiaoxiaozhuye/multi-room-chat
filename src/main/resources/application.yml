@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: multi-room-chat
+  profiles:
+    default: dev
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+
+server:
+  error:
+    include-message: never
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] [requestId=%X{requestId:-},userId=%X{userId:-},roomId=%X{roomId:-},messageId=%X{messageId:-}] %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+mybatis:
+  type-handlers-package: com.multichat.infrastructure.mybatis
+  configuration:
+    map-underscore-to-camel-case: true
+    default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
