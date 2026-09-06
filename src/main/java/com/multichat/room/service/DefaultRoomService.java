@@ -14,6 +14,9 @@ import com.multichat.room.dto.RoomDeletionResponse;
 import com.multichat.room.dto.RoomPage;
 import com.multichat.room.dto.UpdateRoomRequest;
 import com.multichat.room.entity.ChatRoom;
+import com.multichat.websocket.RoomMessageNotifier;
+import com.multichat.common.api.ApiError;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -36,15 +39,24 @@ public class DefaultRoomService implements RoomService {
     private final PermissionService permissionService;
     private final RoomLookupService roomLookupService;
     private final AuditService auditService;
+    private final RoomMessageNotifier roomMessageNotifier;
 
     public DefaultRoomService(ChatRoomMapper roomMapper, MessageMapper messageMapper,
                               PermissionService permissionService, RoomLookupService roomLookupService,
                               AuditService auditService) {
+        this(roomMapper, messageMapper, permissionService, roomLookupService, auditService, null);
+    }
+
+    @Autowired
+    public DefaultRoomService(ChatRoomMapper roomMapper, MessageMapper messageMapper,
+                              PermissionService permissionService, RoomLookupService roomLookupService,
+                              AuditService auditService, RoomMessageNotifier roomMessageNotifier) {
         this.roomMapper = roomMapper;
         this.messageMapper = messageMapper;
         this.permissionService = permissionService;
         this.roomLookupService = roomLookupService;
         this.auditService = auditService;
+        this.roomMessageNotifier = roomMessageNotifier;
     }
 
     @Override
@@ -111,7 +123,7 @@ public class DefaultRoomService implements RoomService {
                 updated.status(), updated.createdBy(), updated.version() + 1, updated.createdAt(), updated.updatedAt());
         auditService.append(new AuditLog(UUID.randomUUID(), null, actorId, "ROOM_UPDATE", "CHAT_ROOM",
                 roomId, roomId, null, AuditStates.room(current), AuditStates.room(persisted), Map.of(), now));
-        invalidateAfterCommit(roomId);
+        invalidateAfterCommit(roomId, false);
         return persisted;
     }
 
@@ -131,13 +143,19 @@ public class DefaultRoomService implements RoomService {
         auditService.append(new AuditLog(UUID.randomUUID(), null, actorId, "ROOM_DELETE", "CHAT_ROOM",
                 roomId, roomId, null, AuditStates.room(current), AuditStates.deletedRoom(current, now),
                 AuditStates.detail("cancelledUnpublishedMessages", cancelledMessages), now));
-        invalidateAfterCommit(roomId);
+        invalidateAfterCommit(roomId, true);
         return new RoomDeletionResponse(roomId, "DELETED", now);
     }
 
-    private void invalidateAfterCommit(UUID roomId) {
+    private void invalidateAfterCommit(UUID roomId, boolean deleted) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { roomLookupService.invalidate(roomId); }
+            @Override public void afterCommit() {
+                roomLookupService.invalidate(roomId);
+                if (deleted && roomMessageNotifier != null) {
+                    roomMessageNotifier.revokeRoom(roomId,
+                            new ApiError(ErrorCode.ROOM_DELETED.name(), ErrorCode.ROOM_DELETED.message()));
+                }
+            }
         });
     }
 

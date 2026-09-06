@@ -26,7 +26,9 @@ chat:
       secret: dGVzdC1zaWduaW5nLWtleS1mb3ItbXVsdGktcm9vbS1jaGF0LTE3LWNoYXJz
       access-token-ttl: PT5M
   review:
-    timeout: PT1S
+    timeout-seconds: 1
     scan-interval: PT1S
   websocket:
     allowed-origins: http://localhost:5173
+    heartbeat-interval: PT25S
+    heartbeat-timeout: PT75S

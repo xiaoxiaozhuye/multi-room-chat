@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/api/v1/auth/**", "/api/v1/system/ping", "/ws/v1/chat").permitAll()
+                        .requestMatchers("/actuator/metrics/**").hasRole("SYSTEM_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

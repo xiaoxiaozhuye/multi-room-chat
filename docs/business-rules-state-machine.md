@@ -140,7 +140,7 @@ PENDING_REVIEW --管理员批准--> APPROVED --轮到 next_publish_seq--> PUBLIS
 
 ### 4.2 审核超时
 
-- 配置键为 `chat.moderation.review-timeout`，默认值为 **30 秒**。
+- 配置键为 `chat.review.timeout-seconds`，默认值为 **30 秒**。
 - 接收 `CHAT` 时计算并持久化 `review_deadline_at = created_at + 当前配置值`，Redis ZSet 只是该截止时间的调度索引。之后修改配置不追溯改变已提交消息的截止时间。
 - 到期任务以数据库条件更新完成 `PENDING_REVIEW → TIMEOUT`；Redis 丢失或重建不会改变以 `review_deadline_at` 为准的结果。
 
@@ -160,6 +160,34 @@ PENDING_REVIEW --管理员批准--> APPROVED --轮到 next_publish_seq--> PUBLIS
 | 审计日志 | 自 `created_at` 起 **3 年** | 到期后由受控的留存任务清理；清理任务自身必须产生系统级审计事件 |
 
 审计日志在保留期内不可由业务接口修改或删除。上述期限是本系统的产品默认值，不替代适用法律、合同或监管要求；若适用要求更长，部署配置与留存任务必须取较长者。
+
+#### 4.4.1 消息正文清理策略
+
+默认策略为**不可逆的正文清除**，而不是删除 `messages` 行或移动到另一张归档表：到期且已处于
+`PUBLISHED`、`REJECTED`、`TIMEOUT` 或 `CANCELLED_BY_ROOM_DELETION` 终态的消息，在固定批次截止点
+`created_at < cutoff_at` 被置为 `content=NULL`，并写入 `content_retired_at`。消息 ID、发送者、房间、
+序列、类型、状态、时间戳和版本仍保留；因此聊天室、成员关系、发布游标、审计日志的 `message_id`
+外键和取证筛选都不会被破坏。未终态消息不属于候选集，必须先由审核/超时流程结束，避免清理任务影响审核。
+
+在线公共历史、本人历史和常规管理消息列表均不返回已清除消息正文，也不以占位文本伪造原内容。管理员
+取证和审计查询仍可按 `messageId`、`roomId` 查询到关联元数据及 `MESSAGE_CONTENT_PURGED` 审计事件，但
+正文不可恢复。重连补偿跳过已清除正文；只要请求序列范围内存在该类缺口，订阅响应为
+`SUBSCRIBED_WITH_GAP`，相应通道的 `*ReplayStatus=GAP`，并返回最早仍可补偿的序列。值为 `"0"`
+表示该通道已经没有任何可补偿正文，客户端必须提示“超出留存期”，不得将其作为网络失败重试。
+
+#### 4.4.2 清理运行、重试和人工保护
+
+消息清理默认每天 03:20 UTC 运行，按最多 500 条/批使用 `FOR UPDATE SKIP LOCKED` 取得候选行；多实例
+或人工运行并发时只会由一个事务取得同一行。每次写入还带有 `content_retired_at IS NULL`、终态和固定
+截止点条件，因此重试和重复运行均是幂等的，绝不会清除运行开始后才到期的数据。单批数据库或审计写入
+失败会整体回滚，并至多立即重试 3 次；最终失败写为 `FAILED`，下一次调度可安全继续。
+
+每次运行在 `message_retention_runs` 中记录触发来源、操作者（人工时）、截止点、批次数、清除数、重试数、
+错误摘要、开始/结束时间，并产生 `MESSAGE_RETENTION_RUN` 审计；每条实际清除消息产生
+`MESSAGE_CONTENT_PURGED` 审计。人工触发仅允许 `SYSTEM_ADMIN` 调用
+`POST /api/v1/admin/retention/messages/purge`，且请求体必须显式包含
+`{"confirmation":"PURGE_EXPIRED_MESSAGE_BODIES"}`。审计日志不由该任务选择或删除；其 3 年独立留存
+策略必须由独立、受控的审计留存流程执行。
 
 ## 5. 逻辑删除房间后的数据访问规则
 

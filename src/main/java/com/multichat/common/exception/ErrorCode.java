@@ -9,6 +9,7 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to perform this action."),
     ROOM_ACCESS_DENIED(HttpStatus.FORBIDDEN, "You are not allowed to access this room."),
     ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "The requested room was not found."),
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "The requested message was not found."),
     ADMIN_ROLE_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "The target user must be an active room administrator."),
     ROOM_FULL(HttpStatus.CONFLICT, "The room has reached its member limit."),
     REVIEW_ALREADY_PROCESSED(HttpStatus.CONFLICT, "This message has already been reviewed."),
@@ -20,6 +21,9 @@ public enum ErrorCode {
     JOIN_REQUEST_ALREADY_PENDING(HttpStatus.CONFLICT, "The user already has a pending join request."),
     MEMBER_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "The join request was not found."),
     MEMBER_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "The join request has already been processed."),
+    MESSAGE_RATE_LIMITED(HttpStatus.UNPROCESSABLE_ENTITY, "Message submission rate limit exceeded."),
+    SENSITIVE_CONTENT_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "Message content cannot be submitted."),
+    MESSAGE_NOT_SENDABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Message content is not sendable."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "The server could not process this request."),
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "The service is temporarily unavailable.");
 

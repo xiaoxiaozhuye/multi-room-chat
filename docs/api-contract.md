@@ -207,6 +207,8 @@ REST 使用 `Authorization: Bearer <accessToken>`。登录、刷新令牌成功�
 
 公共消息历史不承担实时补偿；WebSocket 补偿使用第 4.5 节的双游标。客户端无法从已过期的补偿缺口恢复的内容，必须向用户显示“超出留存期”。
 
+已超过三个月且完成正文清除的消息不在任何常规消息历史结果中出现，也不会返回正文占位符；消息 ID、序列和审计关联仅向授权取证/审计查询保留。重连范围包含已清除序列时，服务端仍从保留消息开始投递，但返回 `SUBSCRIBED_WITH_GAP` 与对应通道的 `GAP`；`earliestAvailable*Seq:"0"` 表示无可补偿正文。
+
 ### 3.4 房间运营和成员审批
 
 | 方法与路径 | 权限 | 请求、校验 | 成功 `data` | 失败 |
@@ -214,6 +216,7 @@ REST 使用 `Authorization: Bearer <accessToken>`。登录、刷新令牌成功�
 | `POST /admin/rooms` | `SYSTEM_ADMIN` | `{name, description?, maxMembers, joinMode}`；采用第 2.2 节校验 | `Room`，初始 `roomStatus=ACTIVE` | `VALIDATION_FAILED` |
 | `PATCH /admin/rooms/{roomId}` | 授权 `ROOM_ADMIN` 或 `SYSTEM_ADMIN` | 可改 `name`、`description`、`maxMembers`、`joinMode`、`roomStatus`；至少一个字段。迁移仅允许 `ACTIVE→PAUSED/CLOSED`、`PAUSED→ACTIVE/CLOSED`、`CLOSED` 无回转 | 更新后的 `Room` | `ROOM_ACCESS_DENIED`、`ROOM_STATE_CONFLICT`、`ROOM_DELETED` |
 | `DELETE /admin/rooms/{roomId}` | `SYSTEM_ADMIN` | 空对象；执行逻辑删除并原子取消未发布普通消息 | `{roomId, roomStatus:"DELETED", deletedAt}` | `ROOM_NOT_FOUND`、`ROOM_DELETED` |
+| `POST /admin/retention/messages/purge` | `SYSTEM_ADMIN` | `{confirmation:"PURGE_EXPIRED_MESSAGE_BODIES"}`；只清除已超过三个月且已终态的正文 | `{runId,status,cutoffAt,batchCount,purgedCount,retryCount,lastError?}` | `FORBIDDEN`、`VALIDATION_FAILED` |
 | `GET /admin/join-requests` | 授权 `ROOM_ADMIN` 或 `SYSTEM_ADMIN` | `roomId`、`memberStatus`（默认 `PENDING`）、`userId`、分页；房间管理员仅能看到已授权房间；按 `createdAt ASC` | 分页 `Membership[]` | `ROOM_ACCESS_DENIED`、`INVALID_CURSOR` |
 | `POST /admin/join-requests/{membershipId}/approve` | 授权 `ROOM_ADMIN` 或 `SYSTEM_ADMIN` | 空对象；目标必须为 `PENDING` | `{membership}`，其 `memberStatus=ACTIVE` | `MEMBER_REQUEST_ALREADY_PROCESSED`、`ROOM_FULL`、`ROOM_PAUSED`、`ROOM_CLOSED`、`ROOM_DELETED` |
 | `POST /admin/join-requests/{membershipId}/reject` | 授权 `ROOM_ADMIN` 或 `SYSTEM_ADMIN` | 空对象；目标必须为 `PENDING` | `{membership}`，其 `memberStatus=REJECTED` | `MEMBER_REQUEST_ALREADY_PROCESSED`、`ROOM_ACCESS_DENIED` |

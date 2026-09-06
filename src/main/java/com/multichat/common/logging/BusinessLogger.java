@@ -10,8 +10,12 @@ public class BusinessLogger {
     private static final Logger log = LoggerFactory.getLogger(BusinessLogger.class);
 
     public void messageLifecycle(String event, Object messageId, Object roomId, Object userId) {
+        messageLifecycle(event, org.slf4j.MDC.get(LogContext.REQUEST_ID), messageId, roomId, userId);
+    }
+
+    public void messageLifecycle(String event, Object requestId, Object messageId, Object roomId, Object userId) {
         try (LogContext.Scope ignored = LogContext.scope(
-                org.slf4j.MDC.get(LogContext.REQUEST_ID), userId, roomId, messageId)) {
+                requestId == null ? null : String.valueOf(requestId), userId, roomId, messageId)) {
             log.info("message_lifecycle event={}", event);
         }
     }

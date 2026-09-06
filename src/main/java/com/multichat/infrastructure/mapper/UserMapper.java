@@ -21,6 +21,14 @@ public interface UserMapper {
             """)
     Optional<UserAccount> findActiveById(java.util.UUID id);
 
+    /** Serializes a sender's submit/retry race inside the caller's transaction. */
+    @Select("""
+            SELECT id, username, email, password_hash, role::text AS role, status::text AS status, created_at, updated_at
+            FROM users WHERE id = #{id} AND status = 'ACTIVE' AND deleted_at IS NULL
+            FOR UPDATE
+            """)
+    Optional<UserAccount> findActiveByIdForUpdate(java.util.UUID id);
+
     @Insert("""
             INSERT INTO users (id, username, email, password_hash, role, status)
             VALUES (#{id}, #{username}, #{email}, #{passwordHash}, CAST(#{role} AS user_role), CAST(#{status} AS user_status))

@@ -12,6 +12,12 @@ public interface PermissionService {
 
     void requireSystemAdmin();
 
+    /** True only for the currently authenticated system administrator. */
+    boolean isSystemAdmin();
+
+    /** True only for the currently authenticated room administrator. */
+    boolean isRoomAdmin();
+
     void requireRoomPermission(UUID roomId, AdminOperation operation);
 
     boolean hasRoomPermission(UUID roomId, AdminOperation operation);

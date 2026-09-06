@@ -30,3 +30,18 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
     default-enum-type-handler: org.apache.ibatis.type.EnumTypeHandler
+
+chat:
+  retention:
+    # Calendar months are used so “three months” follows the business policy,
+    # rather than treating it as an imprecise number of days.
+    messages:
+      enabled: true
+      retention-months: 3
+      batch-size: 500
+      max-batch-retries: 3
+      cron: "0 20 3 * * *"
+  audit:
+    # Audit logs are excluded from message cleanup.  Any future audit purge
+    # must use this independent, longer policy and its own approved process.
+    retention-months: 36

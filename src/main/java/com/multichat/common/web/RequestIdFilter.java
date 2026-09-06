@@ -1,11 +1,13 @@
 package com.multichat.common.web;
 
 import com.multichat.common.logging.LogContext;
+import com.multichat.infrastructure.metrics.HttpRequestMetrics;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -21,9 +23,16 @@ public class RequestIdFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(RequestIdFilter.class);
     public static final String HEADER = "X-Request-Id";
     private final ApiResponseWriter responseWriter;
+    private final HttpRequestMetrics httpRequestMetrics;
 
     public RequestIdFilter(ApiResponseWriter responseWriter) {
+        this(responseWriter, null);
+    }
+
+    @Autowired
+    public RequestIdFilter(ApiResponseWriter responseWriter, HttpRequestMetrics httpRequestMetrics) {
         this.responseWriter = responseWriter;
+        this.httpRequestMetrics = httpRequestMetrics;
     }
 
     @Override
@@ -35,6 +44,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
         } else if (!isUuid(requestId)) {
             response.setHeader(HEADER, UUID.randomUUID().toString());
             responseWriter.write(response, 400, "VALIDATION_FAILED", "Request validation failed.");
+            recordMetrics(response);
             return;
         }
         request.setAttribute(HEADER, requestId);
@@ -46,8 +56,13 @@ public class RequestIdFilter extends OncePerRequestFilter {
         } finally {
             log.info("http_request_completed method={} path={} status={}", request.getMethod(),
                     request.getRequestURI(), response.getStatus());
+            recordMetrics(response);
             LogContext.clearRequestContext();
         }
+    }
+
+    private void recordMetrics(HttpServletResponse response) {
+        if (httpRequestMetrics != null) httpRequestMetrics.record(response.getStatus());
     }
 
     private boolean isUuid(String value) {

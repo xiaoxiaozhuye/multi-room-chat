@@ -3,9 +3,6 @@ package com.multichat.message.service;
 import com.multichat.common.exception.BusinessException;
 import com.multichat.common.logging.BusinessLogger;
 import com.multichat.common.logging.LogContext;
-import com.multichat.audit.AuditStates;
-import com.multichat.audit.entity.AuditLog;
-import com.multichat.audit.service.AuditService;
 import com.multichat.message.dto.SubmitMessageRequest;
 import com.multichat.message.entity.ChatMessage;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -23,11 +20,8 @@ import java.util.UUID;
 @Component
 public class MessageLifecycleLoggingAspect {
     private final BusinessLogger businessLogger;
-    private final AuditService auditService;
-
-    public MessageLifecycleLoggingAspect(BusinessLogger businessLogger, AuditService auditService) {
+    public MessageLifecycleLoggingAspect(BusinessLogger businessLogger) {
         this.businessLogger = businessLogger;
-        this.auditService = auditService;
     }
 
     @Around("execution(* com.multichat.message.service.MessageService.submit(..)) && args(senderId, requestId, request)")
@@ -40,9 +34,6 @@ public class MessageLifecycleLoggingAspect {
                 if (result instanceof ChatMessage message) {
                     LogContext.putMessageId(message.id());
                     businessLogger.messageLifecycle("SUBMIT_PERSISTED", message.id(), request.roomId(), senderId);
-                    auditService.append(new AuditLog(UUID.randomUUID(), requestId, senderId, "MESSAGE_SUBMIT", "MESSAGE",
-                            message.id(), message.roomId(), message.id(), null, AuditStates.message(message),
-                            AuditStates.detail("messageType", message.messageType()), message.createdAt()));
                 }
                 return result;
             } catch (BusinessException exception) {

@@ -26,3 +26,11 @@ src/main/resources/application-local.yaml
 *.log.*
 *.pid
 *.tmp
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local

@@ -38,9 +38,19 @@ public class DefaultPermissionService implements PermissionService {
 
     @Override
     public void requireSystemAdmin() {
-        if (!"SYSTEM_ADMIN".equals(currentActor().role())) {
+        if (!isSystemAdmin()) {
             throw new PermissionDeniedException();
         }
+    }
+
+    @Override
+    public boolean isSystemAdmin() {
+        return "SYSTEM_ADMIN".equals(currentActor().role());
+    }
+
+    @Override
+    public boolean isRoomAdmin() {
+        return "ROOM_ADMIN".equals(currentActor().role());
     }
 
     @Override

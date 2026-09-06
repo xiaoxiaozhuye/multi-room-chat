@@ -12,6 +12,10 @@ import com.multichat.permission.AdminOperation;
 import com.multichat.permission.PermissionService;
 import com.multichat.room.entity.ChatRoom;
 import com.multichat.websocket.WebSocketSessionRegistry;
+import com.multichat.websocket.RoomMessageNotifier;
+import com.multichat.common.api.ApiError;
+import com.multichat.common.exception.ErrorCode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -29,15 +33,24 @@ public class DefaultMemberService implements MemberService {
     private final AuditService auditService;
     private final PermissionService permissionService;
     private final WebSocketSessionRegistry sessionRegistry;
+    private final RoomMessageNotifier roomMessageNotifier;
 
     public DefaultMemberService(ChatRoomMapper roomMapper, RoomMembershipMapper membershipMapper,
                                 AuditService auditService, PermissionService permissionService,
                                 WebSocketSessionRegistry sessionRegistry) {
+        this(roomMapper, membershipMapper, auditService, permissionService, sessionRegistry, null);
+    }
+
+    @Autowired
+    public DefaultMemberService(ChatRoomMapper roomMapper, RoomMembershipMapper membershipMapper,
+                                AuditService auditService, PermissionService permissionService,
+                                WebSocketSessionRegistry sessionRegistry, RoomMessageNotifier roomMessageNotifier) {
         this.roomMapper = roomMapper;
         this.membershipMapper = membershipMapper;
         this.auditService = auditService;
         this.permissionService = permissionService;
         this.sessionRegistry = sessionRegistry;
+        this.roomMessageNotifier = roomMessageNotifier;
     }
 
     @Override
@@ -156,14 +169,23 @@ public class DefaultMemberService implements MemberService {
     private void unsubscribeAfterCommit(UUID userId, UUID roomId) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             // Keeps direct service use deterministic; normal application calls are transactional.
-            sessionRegistry.unsubscribeUserFromRoom(userId, roomId);
+            revokeSubscription(userId, roomId);
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                sessionRegistry.unsubscribeUserFromRoom(userId, roomId);
+                revokeSubscription(userId, roomId);
             }
         });
+    }
+
+    private void revokeSubscription(UUID userId, UUID roomId) {
+        if (roomMessageNotifier != null) {
+            roomMessageNotifier.revokeUser(userId, roomId,
+                    new ApiError(ErrorCode.ROOM_ACCESS_DENIED.name(), ErrorCode.ROOM_ACCESS_DENIED.message()));
+        } else {
+            sessionRegistry.unsubscribeUserFromRoom(userId, roomId);
+        }
     }
 }

@@ -40,7 +40,13 @@ chat:
       secret: ${CHAT_JWT_SECRET:bXVsdGktcm9vbS1jaGF0LWxvY2FsLWRldi1zaWduaW5nLWtleS0xMjM0NTY=}
       access-token-ttl: ${CHAT_JWT_ACCESS_TOKEN_TTL:PT30M}
   review:
-    timeout: ${CHAT_REVIEW_TIMEOUT:PT30S}
+    timeout-seconds: ${CHAT_REVIEW_TIMEOUT_SECONDS:30}
     scan-interval: ${CHAT_REVIEW_SCAN_INTERVAL:PT1S}
+  moderation:
+    sensitive-words: ${CHAT_MODERATION_SENSITIVE_WORDS:}
+    match-mode: ${CHAT_MODERATION_MATCH_MODE:CONTAINS}
+    review-timeout: ${CHAT_MODERATION_REVIEW_TIMEOUT:PT30S}
   websocket:
     allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:5173}
+    heartbeat-interval: ${CHAT_WS_HEARTBEAT_INTERVAL:PT25S}
+    heartbeat-timeout: ${CHAT_WS_HEARTBEAT_TIMEOUT:PT75S}

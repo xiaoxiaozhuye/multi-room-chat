@@ -1,0 +1,4 @@
+:root { color: #1f2937; background: #f5f7fa; font-family: Inter, "Microsoft YaHei", system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; background: #f5f7fa; }
+#app { min-height: 100vh; }

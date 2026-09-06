@@ -26,7 +26,7 @@ public class DefaultAuditService implements AuditService {
             "LOGIN", "JOIN_ROOM", "LEAVE_ROOM", "JOIN_APPROVE", "JOIN_REJECT", "MESSAGE_SUBMIT",
             "MESSAGE_APPROVE", "MESSAGE_REJECT", "MESSAGE_TIMEOUT", "ROOM_CREATE", "ROOM_UPDATE",
             "ROOM_DELETE", "ADMIN_BROADCAST", "EMERGENCY_PUBLISH", "ADMIN_ROOM_PERMISSION_GRANT",
-            "ADMIN_ROOM_PERMISSION_REVOKE");
+            "ADMIN_ROOM_PERMISSION_REVOKE", "MESSAGE_CONTENT_PURGED", "MESSAGE_RETENTION_RUN");
     private final AuditLogMapper auditLogMapper;
     private final PermissionService permissionService;
 
