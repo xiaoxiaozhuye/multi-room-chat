@@ -22,6 +22,11 @@ public class JwtTokenService {
         this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(properties.secret()));
     }
 
+    /**
+     * A token contains identity and the role snapshot only.  Every request still loads
+     * the account from the database, so role or account-status changes take effect
+     * immediately rather than waiting for token expiration.
+     */
     public String createAccessToken(UUID userId, Collection<String> roles) {
         Instant now = Instant.now();
         return Jwts.builder()

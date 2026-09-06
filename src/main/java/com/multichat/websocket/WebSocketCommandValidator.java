@@ -42,12 +42,14 @@ public class WebSocketCommandValidator {
             throw invalid("request", "MALFORMED_JSON");
         }
         if (root == null || !root.isObject()) throw invalid("request", "OBJECT_REQUIRED");
+        rejectClientAuthorityFields(root);
 
         String type = requiredText(root, "type");
         if (!COMMAND_TYPES.contains(type)) throw invalid("type", "UNKNOWN_COMMAND");
         UUID requestId = parseRequestId(requiredText(root, "requestId"));
         JsonNode payload = root.get("payload");
         if (payload == null || !payload.isObject()) throw invalid("payload", "OBJECT_REQUIRED");
+        rejectClientAuthorityFields(payload);
 
         String roomId = null;
         if (type.equals("SUBSCRIBE_ROOM") || type.equals("UNSUBSCRIBE_ROOM") || type.equals("CHAT_SUBMIT")) {
@@ -72,6 +74,12 @@ public class WebSocketCommandValidator {
         List<ValidationError> details = validator.validate(request).stream()
                 .map(this::toError).toList();
         if (!details.isEmpty()) throw new BusinessException(ErrorCode.VALIDATION_FAILED, details);
+    }
+
+    private void rejectClientAuthorityFields(JsonNode payload) {
+        for (String field : List.of("userId", "actorId", "role", "roles", "permissions", "roomPermissions")) {
+            if (payload.has(field)) throw invalid(field, "SERVER_ASSIGNED");
+        }
     }
 
     private ValidationError toError(ConstraintViolation<?> violation) {

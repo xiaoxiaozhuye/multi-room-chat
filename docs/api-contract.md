@@ -28,6 +28,12 @@
 
 `roomSeq` 的首条普通消息为 `"1"`；订阅中 `lastMessageSeq`、`lastNotificationSeq` 未提供时按 `"0"` 处理。所有序列比较必须按整数值而非字符串字典序进行。
 
+### 1.1.1 系统审计查询
+
+`GET /api/v1/admin/audits` 仅允许 `SYSTEM_ADMIN` 调用；普通用户和 `ROOM_ADMIN` 一律返回 `403`，即使其对某个房间拥有管理授权。可选筛选参数为 `actorId`、`roomId`、`messageId`、`action`、`from`、`to`（RFC 3339 UTC 时间）。`action` 仅接受审计动作枚举。结果以 `createdAt DESC, id DESC` 排序，并使用 `page`（从 1 起）和 `size`（1..100，默认 50）分页。
+
+每条审计记录包含操作者、资源和关联的房间/消息 ID、`beforeState`、`afterState`、`detail` 与 `createdAt`。状态变更和它的审计插入属于同一数据库事务。
+
 ### 1.2 认证与写入幂等
 
 REST 使用 `Authorization: Bearer <accessToken>`。登录、刷新令牌成功后返回短期 `accessToken` 与刷新用 `refreshToken`；刷新令牌仅能用于刷新和注销。
@@ -290,7 +296,7 @@ REST 使用 `Authorization: Bearer <accessToken>`。登录、刷新令牌成功�
 | `PUT /admin/rooms/{roomId}/authorizations/{adminUserId}` | `SYSTEM_ADMIN` | 空对象；目标用户必须有 `ROOM_ADMIN` 角色，幂等授予 | `{roomId, adminUserId, grantedAt}` | `ADMIN_ROLE_REQUIRED`（422）、`ROOM_DELETED` |
 | `DELETE /admin/rooms/{roomId}/authorizations/{adminUserId}` | `SYSTEM_ADMIN` | 空对象；幂等撤销 | `{roomId, adminUserId, revoked:true, revokedAt}` | `ROOM_NOT_FOUND` |
 | `GET /admin/audit-logs` | `SYSTEM_ADMIN` | `actorUserId`、`roomId`、`messageId`、`actionType`、`createdFrom`、`createdTo`、`includeDeleted`（默认 `false`）、分页；按 `createdAt DESC, auditId DESC` | 分页完整 `AuditLog[]` | `VALIDATION_FAILED`、`INVALID_CURSOR` |
-| `GET /admin/rooms/{roomId}/audit-logs` | 授权 `ROOM_ADMIN` 或 `SYSTEM_ADMIN` | `actionType`、时间范围、分页；`includeDeleted=true` 仅允许系统管理员 | 分页。房间管理员仅获得业务必要字段，不能获得敏感 `detail` | `ROOM_ACCESS_DENIED`、`ROOM_DELETED` |
+| `GET /admin/audits` | `SYSTEM_ADMIN` | 可按 `actorId`、`roomId`、`messageId`、`action`、`from`、`to` 和分页筛选 | 分页 `AuditLog[]`；包含结构化状态快照和详情。普通用户与 `ROOM_ADMIN` 均不可查询 | `FORBIDDEN`、`VALIDATION_FAILED` |
 | `GET /admin/forensics/rooms/{roomId}` | `SYSTEM_ADMIN` | 必须带 `includeDeleted=true`；分页参数只用于嵌套成员/消息游标，详见响应 | `{room, membersPage, messagesPage, auditPage}`；只读 | `VALIDATION_FAILED`、`ROOM_NOT_FOUND` |
 
 `AuditLog` 为 `{auditId, actorUserId, actionType, resourceType, resourceId, roomId?, messageId?, beforeStatus?, afterStatus?, requestId, createdAt, detail?}`。审计日志不可由任何业务接口修改或删除；读取已删除房间的取证接口必须记录 `FORENSIC_READ` 审计。`includeDeleted=true` 未显式提供时不得返回已删除房间数据。

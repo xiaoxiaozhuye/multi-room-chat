@@ -1,6 +1,8 @@
 package com.multichat.security;
 
 import com.multichat.common.logging.LogContext;
+import com.multichat.infrastructure.mapper.UserMapper;
+import com.multichat.auth.entity.UserAccount;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -14,15 +16,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenService jwtTokenService;
+    private final UserMapper userMapper;
 
-    public JwtAuthenticationFilter(JwtTokenService jwtTokenService) {
+    public JwtAuthenticationFilter(JwtTokenService jwtTokenService, UserMapper userMapper) {
         this.jwtTokenService = jwtTokenService;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -32,11 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ") && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = jwtTokenService.parse(header.substring(7));
-                List<SimpleGrantedAuthority> authorities = roles(claims).stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList();
-                var authentication = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, authorities);
+                UUID userId = UUID.fromString(claims.getSubject());
+                UserAccount user = userMapper.findActiveById(userId).orElse(null);
+                if (user == null) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.role()));
+                var authentication = new UsernamePasswordAuthenticationToken(userId.toString(), null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                LogContext.putUserId(claims.getSubject());
+                LogContext.putUserId(userId);
             } catch (JwtException | IllegalArgumentException ignored) {
                 SecurityContextHolder.clearContext();
             }
@@ -48,11 +58,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private Collection<String> roles(Claims claims) {
-        Object rawRoles = claims.get("roles");
-        return rawRoles instanceof Collection<?> values
-                ? values.stream().map(String::valueOf).toList()
-                : List.of();
-    }
 }

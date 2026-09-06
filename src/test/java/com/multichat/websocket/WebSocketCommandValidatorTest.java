@@ -38,4 +38,15 @@ class WebSocketCommandValidatorTest {
         assertEquals("VALIDATION_FAILED", invalidContent.code());
         assertEquals("content", invalidContent.details().get(0).field());
     }
+
+    @Test
+    void rejectsClientSuppliedIdentityOrAuthorityFields() {
+        BusinessException error = assertThrows(BusinessException.class, () -> validator.validate("""
+                {"type":"CHAT_SUBMIT","requestId":"%s","payload":{"roomId":"%s","content":"hello","role":"SYSTEM_ADMIN"}}
+                """.formatted(UUID.randomUUID(), UUID.randomUUID())));
+
+        assertEquals("VALIDATION_FAILED", error.code());
+        assertEquals("role", error.details().get(0).field());
+        assertEquals("SERVER_ASSIGNED", error.details().get(0).reason());
+    }
 }

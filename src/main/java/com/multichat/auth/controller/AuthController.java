@@ -1,6 +1,8 @@
 package com.multichat.auth.controller;
 
+import com.multichat.auth.dto.AuthenticationResponse;
 import com.multichat.auth.dto.LoginRequest;
+import com.multichat.auth.dto.RegisterRequest;
 import com.multichat.auth.service.AuthService;
 import com.multichat.common.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -19,9 +21,13 @@ public class AuthController {
         this.authService = authService;
     }
 
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<AuthenticationResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.status(201).body(ApiResponse.success(authService.register(request)));
+    }
+
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Void>> login(@Valid @RequestBody LoginRequest request) {
-        authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success(null));
+    public ResponseEntity<ApiResponse<AuthenticationResponse>> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(authService.login(request)));
     }
 }

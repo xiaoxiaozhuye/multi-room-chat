@@ -1,0 +1,2 @@
+ALTER TABLE chat_rooms
+    ADD COLUMN deleted_by UUID REFERENCES users(id) ON DELETE RESTRICT;

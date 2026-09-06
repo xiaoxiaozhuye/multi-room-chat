@@ -1,8 +1,11 @@
 package com.multichat.websocket;
 
+import com.multichat.auth.entity.UserAccount;
+import com.multichat.infrastructure.mapper.UserMapper;
 import com.multichat.security.JwtTokenService;
 import io.jsonwebtoken.JwtException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -13,13 +16,16 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     private final JwtTokenService jwtTokenService;
+    private final UserMapper userMapper;
 
-    public JwtHandshakeInterceptor(JwtTokenService jwtTokenService) {
+    public JwtHandshakeInterceptor(JwtTokenService jwtTokenService, UserMapper userMapper) {
         this.jwtTokenService = jwtTokenService;
+        this.userMapper = userMapper;
     }
 
     @Override
@@ -27,12 +33,20 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
                                    Map<String, Object> attributes) {
         String token = bearerToken(request);
         if (token == null) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
         try {
-            attributes.put("userId", jwtTokenService.parse(token).getSubject());
+            UUID userId = UUID.fromString(jwtTokenService.parse(token).getSubject());
+            UserAccount user = userMapper.findActiveById(userId).orElse(null);
+            if (user == null) {
+                response.setStatusCode(HttpStatus.FORBIDDEN);
+                return false;
+            }
+            attributes.put("userId", userId.toString());
             return true;
         } catch (JwtException | IllegalArgumentException ignored) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         }
     }
