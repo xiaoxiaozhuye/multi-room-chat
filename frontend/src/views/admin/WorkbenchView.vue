@@ -1,0 +1,11 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { adminApi } from '@/api/admin'
+import { useAuthStore } from '@/stores/auth'
+import type { ReviewMessage } from '@/types/api'
+const auth = useAuthStore(); const pendingJoins = ref<number | null>(null); const pendingReviews = ref<number | null>(null); const messages = ref<ReviewMessage[]>([])
+const systemAdmin = computed(() => auth.user?.roles.includes('SYSTEM_ADMIN'))
+async function load(): Promise<void> { const [joins, reviews] = await Promise.allSettled([adminApi.joinRequests({ memberStatus: 'PENDING', page: 1, size: 50 }), adminApi.reviews({ messageStatus: 'PENDING_REVIEW', page: 1, size: 50 })]); if (joins.status === 'fulfilled') pendingJoins.value = joins.value.items.length; if (reviews.status === 'fulfilled') { pendingReviews.value = reviews.value.items.length; messages.value = reviews.value.items.slice(0, 5) } }
+onMounted(load)
+</script>
+<template><section class="admin-page"><div class="page-heading"><div><h2>管理工作台</h2><p>待办优先。统计只来自当前账号可访问的审批和审核列表。</p></div></div><div class="todo-grid"><router-link :to="{name:'admin-join-requests'}"><el-card shadow="never"><div>待审批入群</div><strong>{{pendingJoins ?? '—'}}</strong></el-card></router-link><router-link :to="{name:'admin-review-messages'}"><el-card shadow="never"><div>待审核消息</div><strong>{{pendingReviews ?? '—'}}</strong></el-card></router-link><router-link v-if="systemAdmin" :to="{name:'admin-metrics'}"><el-card shadow="never"><div>系统运行状态</div><strong>查看指标</strong></el-card></router-link></div><el-card shadow="never" class="preview"><template #header>最早待处理消息</template><el-table :data="messages"><el-table-column prop="content" label="内容" min-width="300" show-overflow-tooltip/><el-table-column prop="senderId" label="发送者" min-width="220"/><el-table-column prop="roomSeq" label="房间序号" width="110"/></el-table></el-card></section></template><style scoped>.page-heading{margin-bottom:18px}.page-heading h2{margin:0 0 6px}.page-heading p{margin:0;color:var(--el-text-color-secondary)}.todo-grid{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:16px}.todo-grid a{text-decoration:none;color:inherit}.todo-grid strong{display:block;font-size:30px;margin-top:12px}.preview{margin-top:16px}</style>

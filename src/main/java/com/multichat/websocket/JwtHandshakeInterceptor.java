@@ -62,6 +62,18 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
         if (authorization != null && authorization.startsWith("Bearer ")) {
             return authorization.substring(7);
         }
+        // Browsers do not allow JavaScript to set Authorization during a native
+        // WebSocket handshake.  The web client therefore carries its token in
+        // the requested subprotocols: "chat.v1, bearer.<JWT>".
+        String requestedProtocols = request.getHeaders().getFirst("Sec-WebSocket-Protocol");
+        if (requestedProtocols != null) {
+            for (String protocol : requestedProtocols.split(",")) {
+                String candidate = protocol.trim();
+                if (candidate.startsWith("bearer.") && candidate.length() > "bearer.".length()) {
+                    return candidate.substring("bearer.".length());
+                }
+            }
+        }
         String query = request.getURI().getRawQuery();
         if (query == null) return null;
         for (String pair : query.split("&")) {

@@ -47,6 +47,10 @@ chat:
     match-mode: ${CHAT_MODERATION_MATCH_MODE:CONTAINS}
     review-timeout: ${CHAT_MODERATION_REVIEW_TIMEOUT:PT30S}
   websocket:
-    allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:5173}
+    # Vite may choose a nearby free port, and local browsers may resolve the
+    # development server as IPv4 or IPv6.  These patterns are local-only;
+    # deployed environments must provide their own explicit allow-list through
+    # CHAT_WS_ALLOWED_ORIGINS.
+    allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*,http://[::1]:*}
     heartbeat-interval: ${CHAT_WS_HEARTBEAT_INTERVAL:PT25S}
     heartbeat-timeout: ${CHAT_WS_HEARTBEAT_TIMEOUT:PT75S}

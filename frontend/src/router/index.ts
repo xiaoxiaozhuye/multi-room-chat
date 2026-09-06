@@ -1,9 +1,9 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { appRoutes } from '@/router/routes'
 import { useAuthStore } from '@/stores/auth'
 
-const router = createRouter({ history: createWebHistory(), routes: appRoutes })
+const router = createRouter({ history: createWebHistory(), routes: appRoutes as unknown as RouteRecordRaw[] })
 
 router.beforeEach((to) => {
   const auth = useAuthStore()

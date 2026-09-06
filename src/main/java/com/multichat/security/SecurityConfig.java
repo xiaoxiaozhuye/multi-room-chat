@@ -28,7 +28,11 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**", "/actuator/info", "/api/v1/auth/**", "/api/v1/system/ping", "/ws/v1/chat").permitAll()
+                        // WebSocket upgrades are dispatched through Spring's handler
+                        // mapping rather than a REST controller.  Authorize the whole
+                        // endpoint namespace here; the handshake interceptor performs
+                        // the actual JWT validation from Sec-WebSocket-Protocol.
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/api/v1/auth/**", "/api/v1/system/ping", "/ws/**").permitAll()
                         .requestMatchers("/actuator/metrics/**").hasRole("SYSTEM_ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface RoomService {
     ChatRoom create(UUID actorId, CreateRoomRequest request);
     RoomPage<ChatRoom> list(String name, String roomStatus, String joinMode, int page, int size);
+    RoomPage<ChatRoom> listAdminVisible(String name, String roomStatus, String joinMode, int page, int size);
     ChatRoom get(UUID roomId);
     ChatRoom update(UUID roomId, UpdateRoomRequest request);
     RoomDeletionResponse delete(UUID roomId);

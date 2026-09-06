@@ -2,6 +2,7 @@ package com.multichat.infrastructure.mapper;
 
 import com.multichat.message.entity.ChatMessage;
 import com.multichat.message.entity.PendingReviewMessage;
+import com.multichat.message.dto.PersonalMessageItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -82,6 +83,7 @@ public interface MessageMapper {
      * returned through the public room-history API.
      */
     @Select("""
+            <script>
             SELECT id, request_id, room_id, sender_id, room_seq, notification_seq,
                    message_type::text AS message_type, content, status::text AS status,
                    review_deadline_at, reviewed_at, published_at, version, created_at
@@ -89,9 +91,10 @@ public interface MessageMapper {
             WHERE room_id = #{roomId}
               AND status = CAST('PUBLISHED' AS message_status)
               AND message_type IN (CAST('CHAT' AS message_type), CAST('ADMIN_MESSAGE' AS message_type))
-              AND (#{beforeSeq} IS NULL OR room_seq < #{beforeSeq})
+            <if test="beforeSeq != null"> AND room_seq &lt; #{beforeSeq} </if>
             ORDER BY room_seq DESC, id DESC
             LIMIT #{limit}
+            </script>
             """)
     List<ChatMessage> findPublishedChatHistoryBefore(@Param("roomId") UUID roomId,
                                                       @Param("beforeSeq") Long beforeSeq,
@@ -100,6 +103,7 @@ public interface MessageMapper {
     /** Personal history deliberately does not join room membership: a user can
      * still inspect the disposition of messages they submitted before leaving. */
     @Select("""
+            <script>
             SELECT id, request_id, room_id, sender_id, room_seq, notification_seq,
                    message_type::text AS message_type, content, status::text AS status,
                    review_deadline_at, reviewed_at, published_at, version, created_at
@@ -107,14 +111,63 @@ public interface MessageMapper {
             WHERE room_id = #{roomId}
               AND sender_id = #{senderId}
               AND message_type = CAST('CHAT' AS message_type)
-              AND (#{beforeSeq} IS NULL OR room_seq < #{beforeSeq})
+            <if test="beforeSeq != null"> AND room_seq &lt; #{beforeSeq} </if>
             ORDER BY room_seq DESC, id DESC
             LIMIT #{limit}
+            </script>
             """)
     List<ChatMessage> findOwnChatHistoryBefore(@Param("senderId") UUID senderId,
                                                 @Param("roomId") UUID roomId,
                                                 @Param("beforeSeq") Long beforeSeq,
                                                 @Param("limit") int limit);
+
+    @Select("""
+            <script>
+            SELECT id, request_id, room_id, sender_id, room_seq, notification_seq,
+                   message_type::text AS message_type, content, status::text AS status,
+                   review_deadline_at, reviewed_at, published_at, version, created_at
+            FROM messages
+            WHERE room_id = #{roomId} AND status = CAST('PUBLISHED' AS message_status)
+              AND message_type = CAST('SYSTEM_NOTIFICATION' AS message_type)
+            <if test="beforeSeq != null"> AND notification_seq &lt; #{beforeSeq} </if>
+            ORDER BY notification_seq DESC, id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<ChatMessage> findPublishedNotificationHistoryBefore(@Param("roomId") UUID roomId,
+                                                              @Param("beforeSeq") Long beforeSeq,
+                                                              @Param("limit") int limit);
+
+    /** Global personal history remains available after a room is deleted. */
+    @Select("""
+            <script>
+            SELECT m.id AS message_id, m.room_id, m.room_seq, m.notification_seq, m.sender_id,
+                   m.message_type::text AS message_type, m.content, m.status::text AS message_status,
+                   m.created_at, m.review_deadline_at, m.reviewed_at, m.published_at,
+                   r.name AS room_name, COALESCE(r.deleted_at IS NOT NULL, TRUE) AS room_deleted
+            FROM messages m
+            LEFT JOIN chat_rooms r ON r.id = m.room_id
+            WHERE m.sender_id = #{senderId}
+              AND m.message_type = CAST('CHAT' AS message_type)
+            <if test="roomId != null">
+              AND m.room_id = #{roomId}
+            </if>
+            <if test="messageStatus != null">
+              AND m.status = CAST(#{messageStatus} AS message_status)
+            </if>
+            <if test="cursorCreatedAt != null">
+              AND (m.created_at, m.id) &lt; (#{cursorCreatedAt}, #{cursorMessageId})
+            </if>
+            ORDER BY m.created_at DESC, m.id DESC
+            LIMIT #{limit}
+            </script>
+            """)
+    List<PersonalMessageItem> findOwnMessages(@Param("senderId") UUID senderId,
+                                               @Param("roomId") UUID roomId,
+                                               @Param("messageStatus") String messageStatus,
+                                               @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                               @Param("cursorMessageId") UUID cursorMessageId,
+                                               @Param("limit") int limit);
 
     /** Querying by both id and sender avoids leaking the existence or review
      * status of another user's unpublished message. */
@@ -174,25 +227,29 @@ public interface MessageMapper {
 
     /** Lists only ordinary messages visible to the requesting room administrator. */
     @Select("""
+            <script>
             SELECT m.id, m.request_id, m.room_id, m.sender_id, m.room_seq, m.notification_seq,
                    m.message_type::text AS message_type, m.content, m.status::text AS status,
                    m.review_deadline_at, m.reviewed_at, m.published_at, m.version, m.created_at
             FROM messages m
             WHERE m.message_type = CAST('CHAT' AS message_type)
               AND m.content_retired_at IS NULL
-              AND (#{roomId} IS NULL OR m.room_id = #{roomId})
-              AND (#{senderId} IS NULL OR m.sender_id = #{senderId})
-              AND (#{status} IS NULL OR m.status = CAST(#{status} AS message_status))
-              AND (#{createdFrom} IS NULL OR m.created_at >= #{createdFrom})
-              AND (#{createdTo} IS NULL OR m.created_at <= #{createdTo})
-              AND (#{authorizedAdminId} IS NULL OR EXISTS (
+            <if test="roomId != null"> AND m.room_id = #{roomId} </if>
+            <if test="senderId != null"> AND m.sender_id = #{senderId} </if>
+            <if test="status != null"> AND m.status = CAST(#{status} AS message_status) </if>
+            <if test="createdFrom != null"> AND m.created_at >= #{createdFrom} </if>
+            <if test="createdTo != null"> AND m.created_at &lt;= #{createdTo} </if>
+            <if test="authorizedAdminId != null">
+              AND EXISTS (
                   SELECT 1 FROM admin_room_permissions permission
                   WHERE permission.admin_id = #{authorizedAdminId}
                     AND permission.room_id = m.room_id
                     AND permission.revoked_at IS NULL
-              ))
+              )
+            </if>
             ORDER BY m.created_at ASC, m.room_seq ASC, m.id ASC
             LIMIT #{limit} OFFSET #{offset}
+            </script>
             """)
     List<ChatMessage> findReviewMessages(@Param("roomId") UUID roomId, @Param("senderId") UUID senderId,
                                          @Param("status") String status,

@@ -5,7 +5,7 @@ export function login(payload: { username: string; password: string }): Promise<
   return request<AuthSession>({ method: 'post', url: '/auth/login', data: payload, skipAuthRedirect: true })
 }
 
-export function register(payload: { username: string; password: string; displayName: string }): Promise<AuthSession> {
+export function register(payload: { username: string; email: string; password: string }): Promise<AuthSession> {
   return request<AuthSession>({ method: 'post', url: '/auth/register', data: payload, skipAuthRedirect: true })
 }
 

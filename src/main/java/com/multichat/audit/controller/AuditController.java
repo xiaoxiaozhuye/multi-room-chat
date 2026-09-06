@@ -14,7 +14,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/admin/audits")
+@RequestMapping({"/api/v1/admin/audits", "/api/v1/admin/audit-logs"})
 public class AuditController {
     private final AuditService auditService;
 

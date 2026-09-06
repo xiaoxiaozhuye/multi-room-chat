@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -29,5 +30,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthenticationResponse>> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(ApiResponse.success(authService.login(request)));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Boolean>>> logout(@RequestParam(required = false) String refreshToken) {
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("loggedOut", true)));
     }
 }

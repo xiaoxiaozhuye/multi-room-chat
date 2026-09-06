@@ -1,15 +1,16 @@
 package com.multichat.infrastructure.mapper;
 
 import com.multichat.audit.entity.AuditLog;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Result;
-import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Mapper
@@ -26,22 +27,34 @@ public interface AuditLogMapper {
     int insert(AuditLog auditLog);
 
     @Select("""
+            <script>
             SELECT id, request_id, actor_id, action::text AS action, resource_type::text AS resource_type,
                    resource_id, room_id, message_id, before_state, after_state, detail, created_at
             FROM audit_logs
-            WHERE (#{actorId} IS NULL OR actor_id = #{actorId})
-              AND (#{roomId} IS NULL OR room_id = #{roomId})
-              AND (#{messageId} IS NULL OR message_id = #{messageId})
-              AND (#{action} IS NULL OR action = CAST(#{action} AS audit_action))
-              AND (#{from} IS NULL OR created_at >= #{from})
-              AND (#{to} IS NULL OR created_at <= #{to})
+            WHERE 1 = 1
+            <if test="actorId != null"> AND actor_id = #{actorId} </if>
+            <if test="roomId != null"> AND room_id = #{roomId} </if>
+            <if test="messageId != null"> AND message_id = #{messageId} </if>
+            <if test="action != null"> AND action = CAST(#{action} AS audit_action) </if>
+            <if test="from != null"> AND created_at >= #{from} </if>
+            <if test="to != null"> AND created_at &lt;= #{to} </if>
             ORDER BY created_at DESC, id DESC
             LIMIT #{limit} OFFSET #{offset}
+            </script>
             """)
-    @Results(id = "auditLogResult", value = {
-            @Result(column = "before_state", property = "beforeState", typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class),
-            @Result(column = "after_state", property = "afterState", typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class),
-            @Result(column = "detail", property = "detail", typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class)
+    @ConstructorArgs({
+            @Arg(column = "id", javaType = UUID.class, id = true),
+            @Arg(column = "request_id", javaType = UUID.class),
+            @Arg(column = "actor_id", javaType = UUID.class),
+            @Arg(column = "action", javaType = String.class),
+            @Arg(column = "resource_type", javaType = String.class),
+            @Arg(column = "resource_id", javaType = UUID.class),
+            @Arg(column = "room_id", javaType = UUID.class),
+            @Arg(column = "message_id", javaType = UUID.class),
+            @Arg(column = "before_state", javaType = Map.class, typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class),
+            @Arg(column = "after_state", javaType = Map.class, typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class),
+            @Arg(column = "detail", javaType = Map.class, typeHandler = com.multichat.infrastructure.mybatis.JsonMapTypeHandler.class),
+            @Arg(column = "created_at", javaType = Instant.class)
     })
     List<AuditLog> find(@Param("actorId") UUID actorId, @Param("roomId") UUID roomId,
                         @Param("messageId") UUID messageId, @Param("action") String action,

@@ -5,6 +5,7 @@ import com.multichat.audit.AuditStates;
 import com.multichat.audit.service.AuditService;
 import com.multichat.common.exception.BusinessException;
 import com.multichat.common.exception.ErrorCode;
+import com.multichat.common.exception.PermissionDeniedException;
 import com.multichat.infrastructure.mapper.ChatRoomMapper;
 import com.multichat.infrastructure.mapper.MessageMapper;
 import com.multichat.permission.AdminOperation;
@@ -84,6 +85,21 @@ public class DefaultRoomService implements RoomService {
         String mode = joinMode == null || joinMode.isBlank() ? null : enumValue(joinMode, JOIN_MODES, "joinMode");
         String prefix = name == null || name.isBlank() ? null : normalizedName(name);
         List<ChatRoom> result = roomMapper.findPage(prefix, status, mode, size + 1, (page - 1) * size);
+        boolean hasNext = result.size() > size;
+        return new RoomPage<>(hasNext ? result.subList(0, size) : result, page, size, hasNext);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RoomPage<ChatRoom> listAdminVisible(String name, String roomStatus, String joinMode, int page, int size) {
+        if (!permissionService.isSystemAdmin() && !permissionService.isRoomAdmin()) throw new PermissionDeniedException();
+        if (page < 1 || size < 1 || size > 100) throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        String status = roomStatus == null || roomStatus.isBlank() ? null : enumValue(roomStatus, ROOM_STATUSES, "roomStatus");
+        String mode = joinMode == null || joinMode.isBlank() ? null : enumValue(joinMode, JOIN_MODES, "joinMode");
+        String prefix = name == null || name.isBlank() ? null : normalizedName(name);
+        List<ChatRoom> result = permissionService.isSystemAdmin()
+                ? roomMapper.findPage(prefix, status, mode, size + 1, (page - 1) * size)
+                : roomMapper.findPageGrantedToAdmin(permissionService.currentActorId(), prefix, status, mode, size + 1, (page - 1) * size);
         boolean hasNext = result.size() > size;
         return new RoomPage<>(hasNext ? result.subList(0, size) : result, page, size, hasNext);
     }

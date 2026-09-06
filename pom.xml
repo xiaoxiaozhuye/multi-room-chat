@@ -107,6 +107,15 @@
 
     <build>
         <plugins>
+            <!-- Keep this project on the JDK declared above even when a shared
+                 Maven settings profile supplies compiler defaults for another JDK. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

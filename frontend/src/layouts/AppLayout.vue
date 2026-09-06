@@ -4,12 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { Connection, SwitchButton } from '@element-plus/icons-vue'
 import { appRoutes, type AppRouteRecord } from '@/router/routes'
 import { useAuthStore } from '@/stores/auth'
-import { chatWebSocket } from '@/websocket/client'
+import { chatWebSocket, type ConnectionStatus } from '@/websocket/client'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const connectionStatus = ref(chatWebSocket.status)
+const sessionReplaced = ref(false)
 let removeWebSocketListener: (() => void) | undefined
 const root = appRoutes.find((item) => item.path === '/') as AppRouteRecord
 const menuGroups = computed(() => {
@@ -29,7 +30,11 @@ async function signOut(): Promise<void> {
 
 onMounted(() => {
   removeWebSocketListener = chatWebSocket.on((event) => {
-    if (event.type === 'CONNECTION_STATUS') connectionStatus.value = String((event.payload as { status?: string }).status ?? 'idle')
+    if (event.type === 'CONNECTION_STATUS') {
+      const status = (event.payload as { status?: string }).status
+      if (status && ['idle', 'connecting', 'connected', 'reconnecting', 'closed'].includes(status)) connectionStatus.value = status as ConnectionStatus
+    }
+    if (event.type === 'ERROR' && (event.payload as { code?: string }).code === 'SESSION_REPLACED') sessionReplaced.value = true
   })
 })
 
@@ -53,8 +58,8 @@ onBeforeUnmount(() => removeWebSocketListener?.())
       <el-header class="header">
         <span>{{ String(route.meta.title ?? '多聊天室群聊') }}</span>
         <div class="header-actions">
-          <el-tag :type="connectionStatus === 'connected' ? 'success' : 'info'" effect="plain">
-            <el-icon><Connection /></el-icon> {{ connectionStatus === 'connected' ? '实时已连接' : '实时未连接' }}
+          <el-tag :type="connectionStatus === 'connected' ? 'success' : connectionStatus === 'reconnecting' ? 'warning' : 'info'" effect="plain">
+            <el-icon><Connection /></el-icon> {{ connectionStatus === 'connected' ? '实时已连接' : connectionStatus === 'reconnecting' ? '正在重连…' : '离线，消息可能延迟' }}
           </el-tag>
           <el-dropdown>
             <span class="user-name">{{ auth.user?.displayName ?? auth.user?.username }}</span>
@@ -65,6 +70,10 @@ onBeforeUnmount(() => removeWebSocketListener?.())
       <el-main><router-view /></el-main>
     </el-container>
   </el-container>
+  <el-dialog v-model="sessionReplaced" title="此账号已在其他设备继续使用" width="360px" :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
+    <p>当前页面已停止自动重连，请重新登录后继续使用。</p>
+    <template #footer><el-button type="primary" @click="signOut">重新登录</el-button></template>
+  </el-dialog>
 </template>
 
 <style scoped>

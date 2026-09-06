@@ -24,6 +24,7 @@ import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.PongMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.SubProtocolCapable;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
@@ -31,10 +32,11 @@ import java.time.Instant;
 import java.time.Duration;
 import java.nio.ByteBuffer;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
-public class ChatWebSocketHandler extends TextWebSocketHandler {
+public class ChatWebSocketHandler extends TextWebSocketHandler implements SubProtocolCapable {
     private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
     private final WebSocketSessionRegistry sessionRegistry;
     private final WebSocketCommandValidator commandValidator;
@@ -97,6 +99,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         onlineStatusService.markOnline(java.util.UUID.fromString(userId));
         session.sendMessage(new TextMessage("{\"type\":\"CONNECTED\"}"));
         replaced.ifPresent(previous -> replace(previous));
+    }
+
+    /**
+     * The browser sends {@code chat.v1} alongside its bearer-token transport
+     * protocol.  Explicit negotiation makes the successful handshake
+     * standards-compliant while leaving the token available to the interceptor.
+     */
+    @Override
+    public List<String> getSubProtocols() {
+        return List.of("chat.v1");
     }
 
     @Override
