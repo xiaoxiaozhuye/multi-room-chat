@@ -6,7 +6,20 @@ function query(params: Record<string, string | number | undefined>): Record<stri
 }
 function room(value: any): ChatRoom { return { ...value, roomId: value.roomId ?? value.id, roomStatus: value.roomStatus ?? value.status, activeMemberCount: value.activeMemberCount ?? 0 } }
 function membership(value: any): Membership { return { ...value, membershipId: value.membershipId ?? value.id, memberStatus: value.memberStatus ?? value.status, createdAt: value.createdAt ?? value.requestedAt, joinedAt: value.joinedAt ?? value.activatedAt, room: value.room ? room(value.room) : undefined } }
-function message(value: any): ChatMessage { return { ...value, messageId: value.messageId ?? value.id, messageStatus: value.messageStatus ?? value.status } }
+function sequence(value: unknown): string | null {
+  return value === undefined || value === null ? null : String(value)
+}
+function message(value: any): ChatMessage {
+  return {
+    ...value,
+    messageId: value.messageId ?? value.id,
+    messageStatus: value.messageStatus ?? value.status,
+    // REST serializes Java Long values as JSON numbers, while the WebSocket
+    // protocol deliberately requires sequence cursors to be decimal strings.
+    roomSeq: sequence(value.roomSeq),
+    notificationSeq: sequence(value.notificationSeq),
+  }
+}
 function roomPage(value: any): OffsetPage<ChatRoom> { return { ...value, items: value.items.map(room) } }
 function memberPage(value: any): OffsetPage<Membership> { return { ...value, items: value.items.map(membership) } }
 function messagePage(value: any): CursorPage<ChatMessage> { return { ...value, items: value.items.map(message) } }
@@ -31,8 +44,10 @@ export async function listMyRooms(filters: { memberStatus?: MemberStatus; page?:
   return memberPage(await request<any>({ method: 'get', url: '/users/me/rooms', params: query(filters) }))
 }
 
-export async function listRoomMessages(roomId: string, beforeSeq?: string | number) {
-  return messagePage(await request<any>({ method: 'get', url: `/rooms/${roomId}/messages`, params: query({ beforeSeq, limit: 50 }) }))
+export async function listRoomMessages(roomId: string, beforeSeq?: string | number, options: { silent?: boolean } = {}) {
+  return messagePage(await request<any>({
+    method: 'get', url: `/rooms/${roomId}/messages`, params: query({ beforeSeq, limit: 50 }), skipErrorMessage: options.silent,
+  }))
 }
 
 export async function listRoomNotifications(roomId: string, beforeSeq?: string | number) {

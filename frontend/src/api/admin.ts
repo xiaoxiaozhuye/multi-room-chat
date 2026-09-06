@@ -10,7 +10,10 @@ export const adminApi = {
     return request<Page<AdminRoom>>({ method: 'get', url: '/admin/rooms', params: query({ ...rest, roomStatus: status }) })
   },
   createRoom: (data: Pick<AdminRoom, 'name' | 'description' | 'maxMembers' | 'joinMode'>) => request<AdminRoom>({ method: 'post', url: '/admin/rooms', data }),
-  updateRoom: (roomId: string, data: Partial<Pick<AdminRoom, 'name' | 'description' | 'maxMembers' | 'joinMode' | 'status'>>) => request<AdminRoom>({ method: 'patch', url: `/admin/rooms/${roomId}`, data }),
+  updateRoom: (roomId: string, data: Partial<Pick<AdminRoom, 'name' | 'description' | 'maxMembers' | 'joinMode' | 'status'>>) => {
+    const { status, ...rest } = data
+    return request<AdminRoom>({ method: 'patch', url: `/admin/rooms/${roomId}`, data: { ...rest, roomStatus: status } })
+  },
   deleteRoom: (roomId: string) => request({ method: 'delete', url: `/admin/rooms/${roomId}` }),
   joinRequests: (params: Params = {}) => request<Page<JoinRequest>>({ method: 'get', url: '/admin/join-requests', params: query(params) }),
   approveJoin: (id: string) => request<JoinRequest>({ method: 'post', url: `/admin/join-requests/${id}/approve` }),

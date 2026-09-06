@@ -1,5 +1,6 @@
 package com.multichat.room.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -10,7 +11,7 @@ public record UpdateRoomRequest(
         @Size(max = 10_000) String description,
         @Min(1) @Max(100_000) Integer maxMembers,
         String joinMode,
-        String roomStatus) {
+        @JsonAlias("status") String roomStatus) {
 
     public boolean isEmpty() {
         return name == null && description == null && maxMembers == null

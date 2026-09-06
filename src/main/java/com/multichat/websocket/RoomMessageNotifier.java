@@ -16,6 +16,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -73,7 +74,14 @@ public class RoomMessageNotifier {
         String type = "SYSTEM_NOTIFICATION".equals(message.messageType()) ? "NOTIFICATION" : "CHAT_MESSAGE";
         String senderDisplayName = userMapper.findActiveById(message.senderId()).map(UserAccount::username).orElse(null);
         boolean delivered = true;
-        for (WebSocketSession session : sessionRegistry.sessionsForRoom(message.roomId())) {
+        Collection<WebSocketSession> subscribers = sessionRegistry.sessionsForRoom(message.roomId());
+        log.debug("Publishing WebSocket {} for room {} to {} subscribed session(s)",
+                type, message.roomId(), subscribers.size());
+        if (businessLogger != null) {
+            businessLogger.messageLifecycle("PUSH_DISPATCH subscribers=" + subscribers.size(), message.requestId(),
+                    message.id(), message.roomId(), message.senderId());
+        }
+        for (WebSocketSession session : subscribers) {
             String rawUserId = sessionRegistry.userIdFor(session).orElse(null);
             try {
                 if (rawUserId == null) continue;
@@ -174,7 +182,7 @@ public class RoomMessageNotifier {
             }
             return true;
         } catch (IOException exception) {
-            log.debug("WebSocket delivery failed for session {}", session.getId(), exception);
+            log.warn("WebSocket delivery failed for session {}", session.getId(), exception);
             return false;
         }
     }

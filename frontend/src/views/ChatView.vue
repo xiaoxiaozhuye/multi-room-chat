@@ -12,21 +12,47 @@ import { formatTime, messageStatusText, messageStatusType, roomStatusText, roomS
 const route = useRoute(); const router = useRouter()
 const roomId = computed(() => String(route.params.roomId))
 const room = ref<ChatRoom>(); const messages = ref<ChatMessage[]>([]); const privateMessages = ref<ChatMessage[]>([]); const notifications = ref<ChatMessage[]>([])
-const draft = ref(''); const loading = ref(true); const olderLoading = ref(false); const sendLoading = ref(false); const messageError = ref(''); const replayGap = ref(false)
+const draft = ref(''); const loading = ref(true); const olderLoading = ref(false); const sendLoading = ref(false); const messageError = ref(''); const replayGap = ref(false); const realtimeSubscribed = ref(false)
 const messageCursor = ref<string | number | undefined>(); const messagesHasMore = ref(false); const memberOpen = ref(false); const notificationOpen = ref(false); const members = ref<Membership[]>([]); const membersLoading = ref(false)
 let removeListener: (() => void) | undefined
+let reconcileTimer: number | undefined
+let reconciling = false
 
 const publishedMessages = computed(() => messages.value.slice().sort((a, b) => Number(a.roomSeq ?? 0) - Number(b.roomSeq ?? 0)))
 const canSend = computed(() => room.value?.roomStatus === 'ACTIVE')
 const characterCount = computed(() => Array.from(draft.value).length)
 const statusById = computed(() => new Map(privateMessages.value.map((item) => [item.messageId, item])))
 function maxSequence(items: ChatMessage[], key: 'roomSeq' | 'notificationSeq'): string | undefined {
-  return items.reduce<string | undefined>((max, item) => { const value = item[key]; return value && (!max || BigInt(value) > BigInt(max)) ? value : max }, undefined)
+  return items.reduce<string | undefined>((max, item) => {
+    const value = item[key]
+    return value !== null && (!max || BigInt(value) > BigInt(max)) ? value : max
+  }, undefined)
 }
 function mergeMessage(target: ChatMessage[], message: ChatMessage): void {
   const index = target.findIndex((item) => item.messageId === message.messageId)
   if (index >= 0) target[index] = { ...target[index], ...message }
   else target.push(message)
+}
+async function reconcileRecentMessages(): Promise<void> {
+  // WebSocket is the primary delivery path. This small, silent reconciliation
+  // window prevents a missed frame from leaving the user on stale history.
+  if (loading.value || messageError.value || reconciling) return
+  reconciling = true
+  try {
+    const latest = await listRoomMessages(roomId.value, undefined, { silent: true })
+    const knownIds = new Set(messages.value.map((item) => item.messageId))
+    let receivedNewMessage = false
+    latest.items.forEach((item) => {
+      if (!knownIds.has(item.messageId)) receivedNewMessage = true
+      mergeMessage(messages.value, item)
+    })
+    chatWebSocket.updateCursor(roomId.value, {
+      lastMessageSeq: maxSequence(messages.value, 'roomSeq') ?? '0',
+      lastNotificationSeq: maxSequence(notifications.value, 'notificationSeq') ?? '0',
+    })
+    if (receivedNewMessage) await scrollToLatest()
+  } catch { /* The next scheduled reconciliation retries without interrupting chat. */ }
+  finally { reconciling = false }
 }
 function reviewMessage(payload: Record<string, unknown>, event: WsEvent): void {
   const messageId = String(payload.messageId ?? '')
@@ -52,7 +78,12 @@ function handleEvent(event: WsEvent): void {
     mergeMessage(notifications.value, payload as unknown as ChatMessage)
     chatWebSocket.markRoomEventProcessed(event)
   } else if (event.type === 'REVIEW_STATUS' && payload.roomId === roomId.value) reviewMessage(payload, event)
-  else if (event.type === 'SUBSCRIBE_ROOM' && payload.roomId === roomId.value && payload.subscriptionStatus === 'SUBSCRIBED_WITH_GAP') replayGap.value = true
+  else if (event.type === 'SUBSCRIBE_ROOM' && payload.roomId === roomId.value) {
+    realtimeSubscribed.value = payload.subscriptionStatus === 'SUBSCRIBED' || payload.subscriptionStatus === 'SUBSCRIBED_WITH_GAP'
+    if (payload.subscriptionStatus === 'SUBSCRIBED_WITH_GAP') replayGap.value = true
+  } else if (event.type === 'CONNECTION_STATUS') {
+    realtimeSubscribed.value = false
+  }
   else if (event.type === 'ERROR' && payload.roomId === roomId.value) {
     if (payload.commandType === 'SUBSCRIBE_ROOM') { chatWebSocket.forgetSubscription(roomId.value); messageError.value = payload.code === 'ROOM_DELETED' ? '此房间已删除，无法继续访问。' : '你已失去该房间访问权限。' }
     else if (payload.commandType === 'CHAT_SUBMIT') { sendLoading.value = false; ElMessage.error('消息未能提交，请检查内容后重试。') }
@@ -63,6 +94,7 @@ async function loadInitial(): Promise<void> {
   try {
     const [roomData, history] = await Promise.all([getRoom(roomId.value), listRoomMessages(roomId.value)])
     room.value = roomData; messages.value = history.items; messageCursor.value = history.nextBeforeSeq ?? undefined; messagesHasMore.value = Boolean(history.hasMore)
+    realtimeSubscribed.value = false
     chatWebSocket.subscribe({ roomId: roomId.value, lastMessageSeq: maxSequence(messages.value, 'roomSeq') ?? '0', lastNotificationSeq: maxSequence(notifications.value, 'notificationSeq') ?? '0' })
     await scrollToLatest()
   } catch { messageError.value = '加载聊天室失败。请返回我的聊天室后重试。' } finally { loading.value = false }
@@ -83,8 +115,16 @@ async function openMembers(): Promise<void> { memberOpen.value = true; membersLo
 async function openNotifications(): Promise<void> { notificationOpen.value = true; if (notifications.value.length === 0) notifications.value = (await listRoomNotifications(roomId.value)).items }
 async function exitRoom(): Promise<void> { try { await ElMessageBox.confirm('退出后将停止实时订阅；之后可以重新申请加入。', '退出聊天室？', { confirmButtonText: '退出聊天室', confirmButtonClass: 'el-button--danger', cancelButtonText: '取消', type: 'warning' }); await leaveRoom(roomId.value); chatWebSocket.unsubscribe(roomId.value); await router.replace({ name: 'my-rooms' }); ElMessage.success('已退出聊天室。') } catch { /* user cancelled */ } }
 async function scrollToLatest(): Promise<void> { await nextTick(); document.querySelector('.message-stream')?.scrollTo({ top: 999999, behavior: 'smooth' }) }
-onMounted(() => { removeListener = chatWebSocket.on(handleEvent); void loadInitial() })
-onBeforeUnmount(() => { removeListener?.(); chatWebSocket.unsubscribe(roomId.value) })
+onMounted(() => {
+  removeListener = chatWebSocket.on(handleEvent)
+  void loadInitial()
+  reconcileTimer = window.setInterval(() => { void reconcileRecentMessages() }, 2_000)
+})
+onBeforeUnmount(() => {
+  removeListener?.()
+  if (reconcileTimer !== undefined) window.clearInterval(reconcileTimer)
+  chatWebSocket.unsubscribe(roomId.value)
+})
 </script>
 
 <template>
@@ -92,7 +132,7 @@ onBeforeUnmount(() => { removeListener?.(); chatWebSocket.unsubscribe(roomId.val
   <section v-else class="chat-page">
     <el-skeleton v-if="loading" :rows="12" animated />
     <template v-else-if="room">
-      <header class="chat-header"><div><el-button text @click="router.push({ name: 'my-rooms' })">← 我的聊天室</el-button><h1>{{ room.name }} <el-tag :type="roomStatusType(room.roomStatus)" effect="light">{{ roomStatusText(room.roomStatus) }}</el-tag></h1><p>{{ room.description || '实时讨论' }}</p></div><div class="chat-actions"><el-button @click="openMembers">成员</el-button><el-button @click="openNotifications">历史通知</el-button><el-button type="danger" plain @click="exitRoom">退出聊天室</el-button></div></header>
+      <header class="chat-header"><div><el-button text @click="router.push({ name: 'my-rooms' })">← 我的聊天室</el-button><h1>{{ room.name }} <el-tag :type="roomStatusType(room.roomStatus)" effect="light">{{ roomStatusText(room.roomStatus) }}</el-tag><el-tag :type="realtimeSubscribed ? 'success' : 'warning'" effect="plain">{{ realtimeSubscribed ? '实时已订阅' : '正在订阅实时消息…' }}</el-tag></h1><p>{{ room.description || '实时讨论' }}</p></div><div class="chat-actions"><el-button @click="openMembers">成员</el-button><el-button @click="openNotifications">历史通知</el-button><el-button type="danger" plain @click="exitRoom">退出聊天室</el-button></div></header>
       <el-alert v-if="replayGap" type="warning" :closable="true" title="实时连接已恢复。部分消息已超出留存期，无法补回。" />
       <el-alert v-if="room.roomStatus !== 'ACTIVE'" type="info" :closable="false" :title="`此房间${roomStatusText(room.roomStatus)}，不能发送普通消息；历史消息仍可查看。`" />
       <div v-if="notifications.length" class="emergency-stack"><article v-for="notice in notifications.slice().sort((a, b) => Number(b.notificationSeq ?? 0) - Number(a.notificationSeq ?? 0)).slice(0, 2)" :key="notice.messageId" class="emergency-notice"><strong>紧急通知</strong><SafeText :content="notice.content" /><span>{{ formatTime(notice.publishedAt ?? notice.createdAt) }}</span></article></div>

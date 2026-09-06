@@ -11,7 +11,7 @@ export function roomStatusText(status: RoomStatus): string {
 }
 
 export function messageStatusText(status: MessageStatus): string {
-  return ({ PENDING_REVIEW: '审核中', APPROVED: '审核已通过，等待按序发布', PUBLISHED: '已发布', REJECTED: '未通过审核', TIMEOUT: '审核超时，未发布', CANCELLED_BY_ROOM_DELETION: '房间已删除，消息未发布' })[status]
+  return ({ PENDING_REVIEW: '审核中', APPROVED: '审核已通过，等待按序发布', PUBLISHED: '已发布', REJECTED: '未通过审核', TIMEOUT: '审核超时，未发布', CANCELLED_BY_ROOM_DELETION: '聊天室已删除，消息未发布' })[status]
 }
 
 export function roomStatusType(status: RoomStatus): 'success' | 'warning' | 'info' | 'danger' {

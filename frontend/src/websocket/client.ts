@@ -12,7 +12,6 @@ export class ChatWebSocketClient {
   private token?: string
   private listeners = new Set<EventListener>()
   private subscriptions = new Map<string, RoomSubscription>()
-  private deliveredMessageIds = new Set<string>()
   private currentStatus: ConnectionStatus = 'idle'
 
   get status(): ConnectionStatus { return this.currentStatus }
@@ -33,7 +32,6 @@ export class ChatWebSocketClient {
     this.manualClose = true
     this.clearRetry()
     this.subscriptions.clear()
-    this.deliveredMessageIds.clear()
     this.socket?.close(1000, 'client logout')
     this.socket = undefined
     this.setStatus('closed')
@@ -64,8 +62,9 @@ export class ChatWebSocketClient {
 
   /**
    * Commit replay cursors only after the view has merged the event into its
-   * rendered list.  This prevents reconnect recovery from skipping a frame
-   * that was received but could not be displayed.
+   * rendered list. The view merges by messageId, which is also where event
+   * deduplication must happen: dropping a frame here would make a replayed
+   * message disappear if it arrived while the initial HTTP history loaded.
    */
   markRoomEventProcessed(event: WsEvent): void {
     if (event.type !== 'CHAT_MESSAGE' && event.type !== 'NOTIFICATION') return
@@ -89,9 +88,9 @@ export class ChatWebSocketClient {
   private open(): void {
     if (!this.token) return
     this.setStatus(this.attempts === 0 ? 'connecting' : 'reconnecting')
-    // Use Vite's WebSocket proxy by default during development.  An absolute
-    // localhost URL makes a deployed frontend try to connect to the visitor's
-    // own machine, and also bypasses the configured development proxy.
+    // Use Vite's WebSocket proxy by default during development. An absolute
+    // localhost URL would bypass the configured proxy and is unsuitable for
+    // a deployed frontend unless VITE_WS_URL is explicitly configured.
     const endpoint = import.meta.env.VITE_WS_URL ?? '/ws/v1/chat'
     const authMode = import.meta.env.VITE_WS_AUTH_MODE ?? 'subprotocol'
     const url = authMode === 'query'
@@ -114,7 +113,6 @@ export class ChatWebSocketClient {
   private receive(data: unknown): void {
     try {
       const event = JSON.parse(String(data)) as WsEvent
-      if (this.isDuplicatePublishedMessage(event)) return
       this.emit(event)
     }
     catch { this.emit({ type: 'ERROR', requestId: createRequestId(), payload: { code: 'INVALID_EVENT', message: '收到无法识别的实时消息。' } }) }
@@ -122,21 +120,6 @@ export class ChatWebSocketClient {
 
   private isNonNegativeIntegerString(value: unknown): value is string {
     return typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value)
-  }
-
-  /** The server intentionally uses at-least-once delivery for room events. */
-  private isDuplicatePublishedMessage(event: WsEvent): boolean {
-    if (event.type !== 'CHAT_MESSAGE' && event.type !== 'NOTIFICATION') return false
-    const messageId = (event.payload as { messageId?: unknown })?.messageId
-    if (typeof messageId !== 'string' || !messageId) return false
-    if (this.deliveredMessageIds.has(messageId)) return true
-    this.deliveredMessageIds.add(messageId)
-    // Bound memory while retaining a comfortably large reconnect/retry window.
-    if (this.deliveredMessageIds.size > 10_000) {
-      const oldest = this.deliveredMessageIds.values().next().value
-      if (oldest) this.deliveredMessageIds.delete(oldest)
-    }
-    return false
   }
 
   private closed(event: CloseEvent): void {

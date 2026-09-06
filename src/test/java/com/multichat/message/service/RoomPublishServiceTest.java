@@ -31,7 +31,7 @@ class RoomPublishServiceTest {
     }
 
     @Test
-    void rejectedPredecessorIsSkippedBeforeApprovedSuccessorIsDelivered() {
+    void rejectedPredecessorIsSkippedBeforeApprovedSuccessorIsPublishedAndDelivered() {
         ChatMessage rejected = message(1, "REJECTED");
         ChatMessage approved = message(2, "APPROVED");
         when(messageMapper.lockRoomForPublication(roomId)).thenReturn(Optional.of(roomId));
@@ -39,30 +39,32 @@ class RoomPublishServiceTest {
                 .thenReturn(Optional.of(rejected), Optional.of(approved), Optional.empty());
         when(messageMapper.advanceRoomPublishCursor(roomId, 1)).thenReturn(1);
         when(messageMapper.advanceRoomPublishCursor(roomId, 2)).thenReturn(1);
-        when(notifier.publishApproved(eq(approved), any())).thenReturn(true);
         when(messageMapper.markApprovedPublished(eq(approved.id()), any())).thenReturn(1);
 
         service().publishAvailable(roomId);
 
         var ordered = inOrder(messageMapper, notifier);
         ordered.verify(messageMapper).advanceRoomPublishCursor(roomId, 1);
-        ordered.verify(notifier).publishApproved(eq(approved), any());
         ordered.verify(messageMapper).markApprovedPublished(eq(approved.id()), any());
         ordered.verify(messageMapper).advanceRoomPublishCursor(roomId, 2);
+        ordered.verify(notifier).notifyPublished(argThat(message ->
+                approved.id().equals(message.id()) && "PUBLISHED".equals(message.status())));
     }
 
     @Test
-    void failedFirstPushKeepsApprovedMessageAndCursorForCompensation() {
+    void publicationIsCommittedEvenWhenThereAreNoActiveSubscribers() {
         ChatMessage approved = message(1, "APPROVED");
         when(messageMapper.lockRoomForPublication(roomId)).thenReturn(Optional.of(roomId));
-        when(messageMapper.findNextRoomPublishCandidateForUpdate(roomId)).thenReturn(Optional.of(approved));
-        when(notifier.publishApproved(eq(approved), any())).thenReturn(false);
+        when(messageMapper.findNextRoomPublishCandidateForUpdate(roomId))
+                .thenReturn(Optional.of(approved), Optional.empty());
+        when(messageMapper.markApprovedPublished(eq(approved.id()), any())).thenReturn(1);
+        when(messageMapper.advanceRoomPublishCursor(roomId, 1)).thenReturn(1);
 
         service().publishAvailable(roomId);
 
-        verify(notifier).publishApproved(eq(approved), any());
-        verify(messageMapper, never()).markApprovedPublished(any(), any());
-        verify(messageMapper, never()).advanceRoomPublishCursor(any(), anyLong());
+        verify(messageMapper).markApprovedPublished(eq(approved.id()), any());
+        verify(messageMapper).advanceRoomPublishCursor(roomId, 1);
+        verify(notifier).notifyPublished(any());
     }
 
     private RoomPublishService service() {

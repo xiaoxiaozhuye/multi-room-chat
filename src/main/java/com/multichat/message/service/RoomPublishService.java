@@ -7,6 +7,8 @@ import com.multichat.websocket.RoomMessageNotifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,10 +16,10 @@ import java.util.UUID;
 /**
  * The single publication gate for ordinary room messages.
  *
- * <p>The room row is locked for the entire delivery attempt.  This intentionally
- * trades a short per-room critical section for a strict externally observable
- * room_seq order.  A failed send does not mutate either the message or cursor;
- * the compensation job will therefore retry the same sequence first.</p>
+ * <p>The room row is locked for the state transition and cursor advance only.
+ * WebSocket delivery happens after the publication transaction commits, so a
+ * browser can never be notified about a message that is still invisible to
+ * replay/history readers.</p>
  */
 @Service
 public class RoomPublishService {
@@ -87,17 +89,11 @@ public class RoomPublishService {
 
             Instant publishedAt = Instant.now();
             log(compensationAttempt ? "PUBLISH_COMPENSATION_ATTEMPT" : "PUBLISH_ATTEMPT", candidate);
-            if (!roomMessageNotifier.publishApproved(candidate, publishedAt)) {
-                // At-least-once: keep APPROVED and the cursor in place for a retry.
-                log(compensationAttempt ? "PUBLISH_COMPENSATION_RETRY_SCHEDULED"
-                        : "PUBLISH_DELIVERY_FAILED_WAITING_COMPENSATION", candidate);
-                return new RoomPublicationAttempt(targetPublished,
-                        targetMessageId != null && targetMessageId.equals(candidate.id()));
-            }
             if (messageMapper.markApprovedPublished(candidate.id(), publishedAt) != 1) {
                 throw new IllegalStateException("Approved message disappeared during publication");
             }
             requireCursorAdvance(roomId, candidate.roomSeq());
+            notifyPublishedAfterCommit(published(candidate, publishedAt));
             log(compensationAttempt ? "PUBLISH_COMPENSATION_COMPLETED" : "PUBLISH_COMPLETED", candidate);
             if (targetMessageId != null && targetMessageId.equals(candidate.id())) targetPublished = true;
         }
@@ -114,6 +110,23 @@ public class RoomPublishService {
         if (messageMapper.advanceRoomPublishCursor(roomId, roomSeq) != 1) {
             throw new IllegalStateException("Room publication cursor changed while locked");
         }
+    }
+
+    private ChatMessage published(ChatMessage message, Instant publishedAt) {
+        return new ChatMessage(message.id(), message.requestId(), message.roomId(), message.senderId(),
+                message.roomSeq(), message.notificationSeq(), message.messageType(), message.content(), "PUBLISHED",
+                message.reviewDeadlineAt(), message.reviewedAt(), publishedAt, message.version(), message.createdAt());
+    }
+
+    private void notifyPublishedAfterCommit(ChatMessage message) {
+        Runnable notify = () -> roomMessageNotifier.notifyPublished(message);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            notify.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { notify.run(); }
+        });
     }
 
     private void log(String event, ChatMessage message) {
