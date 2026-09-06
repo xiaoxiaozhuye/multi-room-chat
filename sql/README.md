@@ -8,7 +8,7 @@ Get-ChildItem .\sql\migrations\V*.sql | Sort-Object Name | ForEach-Object {
 }
 ```
 
-`V004__demo_data.sql` is development seed data, not production data. The three demo password hashes are deliberately invalid placeholders.
+`V004__demo_data.sql` is development seed data, not production data. The three demo password hashes are deliberately invalid placeholders. `V011__default_system_administrator.sql` creates the development bootstrap account `admin` / `Admin123!` with the `SYSTEM_ADMIN` role; change its password before any non-development deployment.
 
 After migrating the development database, run `psql --set ON_ERROR_STOP=1 --file .\sql\verification\verify_core_invariants.sql $env:DATABASE_URL` to check the main database-enforced invariants. It runs inside a transaction and rolls back.
 

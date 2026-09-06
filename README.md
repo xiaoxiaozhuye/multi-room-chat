@@ -13,6 +13,8 @@ lives in `security`, `common`, and `infrastructure`.
 The `dev` profile is the default. It runs the versioned migrations in
 `src/main/resources/db/migration` with Flyway. Environment variables in
 `application-dev.yml` override database, Redis, JWT and audit timeout values.
+The development bootstrap account is `admin` / `Admin123!` and has the
+`SYSTEM_ADMIN` role; change the password before any non-development deployment.
 
 ## Test and coverage
 

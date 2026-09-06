@@ -9,7 +9,7 @@ const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const registerMode = ref(false)
-const form = reactive({ username: '', email: '', password: '' })
+const form = reactive({ username: 'admin', email: '', password: 'Admin123!' })
 const title = computed(() => registerMode.value ? '创建账号' : '登录')
 
 async function submit(): Promise<void> {
