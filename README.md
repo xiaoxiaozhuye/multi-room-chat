@@ -1,33 +1,79 @@
-# Multi-room chat backend
+# 多聊天室群聊项目
 
-Java 17 / Spring Boot 3 modular-monolith backend. Domain code is separated into
-`auth`, `room`, `member`, `message`, `audit`, and `websocket`; cross-cutting code
-lives in `security`, `common`, and `infrastructure`.
+## 项目截图
 
-## Run locally
+### 登录页面
 
-1. The development profile targets the `postgres` database at `192.168.186.131:5432` as user `postgres`; set the required `CHAT_DB_PASSWORD` environment variable before running. Use `CHAT_DB_URL` to target a dedicated application database.
-2. Start Redis (default `localhost:6379`).
-3. Run `D:\u_soft\apache-maven-3.9.7\bin\mvn.cmd spring-boot:run`.
+![登录页面](img/screenshot-1788696630566.png)
 
-The `dev` profile is the default. It runs the versioned migrations in
-`src/main/resources/db/migration` with Flyway. Environment variables in
-`application-dev.yml` override database, Redis, JWT and audit timeout values.
-The development bootstrap account is `admin` / `Admin123!` and has the
-`SYSTEM_ADMIN` role; change the password before any non-development deployment.
+### 聊天室列表
 
-## Test and coverage
+![聊天室列表](img/screenshot-1788696646981.png)
 
-Run `D:\u_soft\apache-maven-3.9.7\bin\mvn.cmd test`. Tests use the `test`
-profile's in-memory H2 datasource and do not require PostgreSQL or Redis. JaCoCo
-HTML output is generated at `target/site/jacoco/index.html`.
+### 聊天室会话
 
-## Layering rule
+![聊天室会话](img/screenshot-1788696575947.png)
 
-`controller -> service -> mapper -> PostgreSQL/Redis`. Controllers use request
-and response DTOs only; services own transactional business rules; entities map
-to persisted rows; mapper interfaces live in `infrastructure.mapper`. Domain
-modules must not call another module's mapper directly.
+### 聊天室运营
 
-Redis key ownership, recovery and degradation behaviour are documented in
-[docs/redis-infrastructure.md](docs/redis-infrastructure.md).
+![聊天室运营](img/screenshot-1788696957079.png)
+
+### 广播与通知
+
+![广播与通知](img/screenshot-1788696934089.png)
+
+### 运行状态
+
+![运行状态](img/screenshot-1788696969363.png)
+
+## 环境要求
+
+- Java：17
+- Maven：3.9.7
+- PostgreSQL：14 或更高版本
+- Redis：6.2 或更高版本，本地不设置密码
+- Node.js：18 或更高版本，建议使用 Node.js 20 LTS
+
+## 数据库初始化
+
+初始化 SQL 文件位于 `sql/migrations` 目录；项目实际启动时由 Flyway 执行 `src/main/resources/db/migration` 目录中的同版本迁移脚本。
+
+首次启动前请先在 PostgreSQL 中创建配置文件指定的数据库。项目启动后会自动执行数据库迁移，并创建所需的数据表和初始化数据，无需手动执行建表 SQL。
+
+## 启动步骤
+
+1. 修改 `src/main/resources/application-dev.yml` 中的 PostgreSQL 配置：
+
+   ```yaml
+   spring:
+     datasource:
+       url: jdbc:postgresql://localhost:5432/postgres
+       username: postgres
+       password: 你的PostgreSQL密码
+   ```
+
+2. 启动 Redis，保持默认无密码配置。
+
+3. 在 IDE 中运行后端启动类 `MultiRoomChatApplication.java`。
+
+4. 打开终端并启动前端：
+
+   ```powershell
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+5. 在浏览器打开终端显示的前端地址，通常为 `http://localhost:5173`。
+
+## 普通用户注册
+
+在登录页面点击“还没有账号？创建账号”，填写用户名、邮箱和密码后，点击“注册并登录”即可创建普通用户账号并自动登录。
+
+- 用户名：3 至 32 个字符，只能包含字母、数字、下划线或连字符。
+- 邮箱：有效邮箱地址，最长 254 个字符。
+- 密码：8 至 72 个字符。
+
+## 默认账号
+
+初始管理员账号：`admin` / `Admin123!`。
