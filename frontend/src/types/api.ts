@@ -4,6 +4,9 @@ export interface AuthenticatedUser {
   userId: string
   username: string
   displayName?: string
+  avatarUrl?: string
+  level: number
+  bio?: string
   email?: string
   roles: UserRole[]
   createdAt: string
@@ -40,6 +43,7 @@ export interface RoomAuthorization { authorizationId: string; roomId: string; ad
 export interface AuditItem { id: string; requestId?: string; actorId: string; action: string; resourceType: string; resourceId: string; roomId?: string; messageId?: string; beforeState?: Record<string, unknown>; afterState?: Record<string, unknown>; detail?: Record<string, unknown>; createdAt: string }
 export interface DeliveryResult { roomId: string; deliveryStatus: 'SUCCESS' | 'NO_PERMISSION' | 'ROOM_NOT_SENDABLE' | 'PENDING_COMPENSATION'; messageId?: string; roomSeq?: number; notificationSeq?: number; messageStatus?: string; errorCode?: string }
 export interface SystemMetrics { observedAt: string; webSocketConnectionCount: number; pendingReviewCount: number; reviewTimeoutCountToday: number; messageCountToday: number; averageReviewLatencyMsToday: number; pushFailureCountToday: number; httpErrorRate: number; databasePool: { active: number; idle: number; max: number } }
+export interface ModerationSettings { enabled: boolean }
 
 export type RoomStatus = 'ACTIVE' | 'PAUSED' | 'CLOSED' | 'DELETED'
 export type JoinMode = 'OPEN' | 'APPROVAL'
@@ -64,6 +68,9 @@ export interface Membership {
   roomId: string
   userId: string
   displayName?: string
+  avatarUrl?: string
+  level?: number
+  bio?: string
   memberStatus: MemberStatus
   joinedAt?: string
   createdAt: string

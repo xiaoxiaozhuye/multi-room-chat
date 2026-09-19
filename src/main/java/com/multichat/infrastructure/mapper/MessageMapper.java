@@ -40,6 +40,16 @@ public interface MessageMapper {
             """)
     int insertPendingChat(@Param("message") ChatMessage message);
 
+    /** Ordinary user messages when backend moderation is disabled. */
+    @Insert("""
+            INSERT INTO messages (id, request_id, room_id, sender_id, message_type, content, status,
+                                  version, created_at, updated_at)
+            VALUES (#{message.id}, #{message.requestId}, #{message.roomId}, #{message.senderId},
+                    CAST('CHAT' AS message_type), #{message.content}, CAST('APPROVED' AS message_status),
+                    0, #{message.createdAt}, #{message.createdAt})
+            """)
+    int insertApprovedChat(@Param("message") ChatMessage message);
+
     /**
      * Administrative messages enter the same ordered room stream as CHAT, but
      * do not enter manual review.  The database trigger remains responsible

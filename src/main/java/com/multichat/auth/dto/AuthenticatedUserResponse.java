@@ -6,5 +6,6 @@ import java.util.UUID;
 
 /** Public account projection. Password credentials must never be serialized. */
 public record AuthenticatedUserResponse(UUID userId, String username, String email, List<String> roles,
-                                        Instant createdAt) {
+                                        Instant createdAt, String displayName, String avatarUrl,
+                                        int level, String bio) {
 }

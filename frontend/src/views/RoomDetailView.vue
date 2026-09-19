@@ -36,7 +36,6 @@ onMounted(() => { void load() })
   <section class="detail-page">
     <el-skeleton v-if="loading" :rows="6" animated />
     <template v-else-if="room">
-      <el-button text @click="router.push({ name: 'rooms' })">← 返回发现聊天室</el-button>
       <el-card shadow="never" class="room-detail-card"><div class="room-card-top"><div><h1>{{ room.name }}</h1><p class="room-description">{{ room.description || '暂未填写房间介绍。' }}</p></div><el-tag :type="roomStatusType(room.roomStatus)">{{ roomStatusText(room.roomStatus) }}</el-tag></div><p class="room-meta">{{ room.activeMemberCount }} / {{ room.maxMembers }} 人 · {{ room.joinMode === 'OPEN' ? '公开加入' : '需要审批' }}</p><el-button type="primary" size="large" :disabled="disabled && membership?.memberStatus !== 'ACTIVE'" :loading="joining" @click="primary">{{ action }}</el-button></el-card>
       <el-alert v-if="membership?.memberStatus === 'PENDING'" type="warning" :closable="false" title="你的申请正在等待审批；本期暂不支持撤回申请。" />
       <el-alert v-else-if="room.roomStatus !== 'ACTIVE'" type="info" :closable="false" :title="`${roomStatusText(room.roomStatus)}的房间暂不可加入；已加入成员仍可按权限查看历史。`" />

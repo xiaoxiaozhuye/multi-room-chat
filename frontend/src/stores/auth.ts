@@ -26,6 +26,11 @@ export const useAuthStore = defineStore('auth', () => {
     applySession(await authApi.login(credentials))
   }
 
+  function updateUser(next: AuthenticatedUser): void {
+    user.value = next
+    saveSession({ user: next, accessToken: accessToken.value!, refreshToken: refreshToken.value, expiresAt: expiresAt.value! })
+  }
+
   async function signOut(notifyServer = true): Promise<void> {
     try {
       if (notifyServer && accessToken.value) await authApi.logout(refreshToken.value)
@@ -46,5 +51,5 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.some((role) => user.value?.roles.includes(role) || (role === 'ROOM_ADMIN' && user.value?.roles.includes('SYSTEM_ADMIN')))
   }
 
-  return { user, accessToken, expiresAt, isAuthenticated, applySession, signIn, signOut, clearLocalSession, hasAnyRole }
+  return { user, accessToken, expiresAt, isAuthenticated, applySession, signIn, signOut, updateUser, clearLocalSession, hasAnyRole }
 })

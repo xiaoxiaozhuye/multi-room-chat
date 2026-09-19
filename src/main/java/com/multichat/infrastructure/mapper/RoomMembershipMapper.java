@@ -16,29 +16,34 @@ import java.util.UUID;
 @Mapper
 public interface RoomMembershipMapper {
     @Select("""
-            SELECT id, user_id, room_id, status::text AS status, requested_at, activated_at, version
-            FROM user_chat_rooms WHERE user_id = #{userId} AND room_id = #{roomId}
-              AND status = 'ACTIVE'
+            SELECT m.id, m.user_id, m.room_id, m.status::text AS status, m.requested_at, m.activated_at, m.version,
+                   u.display_name, u.avatar_url, u.level, u.bio
+            FROM user_chat_rooms m JOIN users u ON u.id = m.user_id
+            WHERE m.user_id = #{userId} AND m.room_id = #{roomId}
+              AND m.status = 'ACTIVE'
             """)
     Optional<RoomMembership> findActive(UUID userId, UUID roomId);
 
     @Select("""
-            SELECT id, user_id, room_id, status::text AS status, requested_at, activated_at, version
-            FROM user_chat_rooms WHERE user_id = #{userId} AND room_id = #{roomId}
-              AND status IN (CAST('PENDING' AS membership_status), CAST('ACTIVE' AS membership_status))
-            ORDER BY created_at DESC LIMIT 1
+            SELECT m.id, m.user_id, m.room_id, m.status::text AS status, m.requested_at, m.activated_at, m.version,
+                   u.display_name, u.avatar_url, u.level, u.bio
+            FROM user_chat_rooms m JOIN users u ON u.id = m.user_id WHERE m.user_id = #{userId} AND m.room_id = #{roomId}
+              AND m.status IN (CAST('PENDING' AS membership_status), CAST('ACTIVE' AS membership_status))
+            ORDER BY m.created_at DESC LIMIT 1
             """)
     Optional<RoomMembership> findLive(@Param("userId") UUID userId, @Param("roomId") UUID roomId);
 
     @Select("""
-            SELECT id, user_id, room_id, status::text AS status, requested_at, activated_at, version
-            FROM user_chat_rooms WHERE id = #{membershipId}
+            SELECT m.id, m.user_id, m.room_id, m.status::text AS status, m.requested_at, m.activated_at, m.version,
+                   u.display_name, u.avatar_url, u.level, u.bio
+            FROM user_chat_rooms m JOIN users u ON u.id = m.user_id WHERE m.id = #{membershipId}
             """)
     Optional<RoomMembership> findById(@Param("membershipId") UUID membershipId);
 
     @Select("""
-            SELECT id, user_id, room_id, status::text AS status, requested_at, activated_at, version
-            FROM user_chat_rooms WHERE id = #{membershipId}
+            SELECT m.id, m.user_id, m.room_id, m.status::text AS status, m.requested_at, m.activated_at, m.version,
+                   u.display_name, u.avatar_url, u.level, u.bio
+            FROM user_chat_rooms m JOIN users u ON u.id = m.user_id WHERE m.id = #{membershipId}
             FOR UPDATE
             """)
     Optional<RoomMembership> findByIdForUpdate(@Param("membershipId") UUID membershipId);
@@ -70,10 +75,11 @@ public interface RoomMembershipMapper {
 
     @Select("""
             <script>
-            SELECT id, user_id, room_id, status::text AS status, requested_at, activated_at, version
-            FROM user_chat_rooms WHERE room_id = #{roomId}
-            <if test="memberStatus != null"> AND status = CAST(#{memberStatus} AS membership_status) </if>
-            ORDER BY activated_at DESC NULLS LAST, id DESC LIMIT #{limit} OFFSET #{offset}
+            SELECT m.id, m.user_id, m.room_id, m.status::text AS status, m.requested_at, m.activated_at, m.version,
+                   u.display_name, u.avatar_url, u.level, u.bio
+            FROM user_chat_rooms m JOIN users u ON u.id = m.user_id WHERE m.room_id = #{roomId}
+            <if test="memberStatus != null"> AND m.status = CAST(#{memberStatus} AS membership_status) </if>
+            ORDER BY m.activated_at DESC NULLS LAST, m.id DESC LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
     List<RoomMembership> findByRoom(@Param("roomId") UUID roomId, @Param("memberStatus") String memberStatus,

@@ -294,18 +294,23 @@ public class ChatWebSocketHandler extends TextWebSocketHandler implements SubPro
     private void sendReviewStatus(WebSocketSession session, java.util.UUID causationRequestId, ChatMessage message)
             throws IOException {
         if (!session.isOpen()) return;
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("messageId", message.id().toString());
+        payload.put("roomId", message.roomId().toString());
+        payload.put("roomSeq", Long.toString(message.roomSeq()));
+        // An unmoderated CHAT is published by the ordered publication gate
+        // before this confirmation is sent. It has no review deadline.
+        payload.put("messageStatus", "APPROVED".equals(message.status()) && message.reviewDeadlineAt() == null
+                ? "PUBLISHED" : message.status());
+        if (message.reviewDeadlineAt() != null) {
+            payload.put("reviewDeadlineAt", message.reviewDeadlineAt().toString());
+        }
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(Map.of(
                 "type", "REVIEW_STATUS",
                 "requestId", java.util.UUID.randomUUID().toString(),
                 "causationRequestId", causationRequestId.toString(),
                 "occurredAt", Instant.now().toString(),
-                "payload", Map.of(
-                        "messageId", message.id().toString(),
-                        "roomId", message.roomId().toString(),
-                        "roomSeq", Long.toString(message.roomSeq()),
-                        "messageStatus", message.status(),
-                        "reviewDeadlineAt", message.reviewDeadlineAt().toString()
-                )
+                "payload", payload
         ))));
     }
 

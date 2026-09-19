@@ -72,7 +72,7 @@ public class RoomMessageNotifier {
 
     private boolean deliverToSubscribers(ChatMessage message, String eventStatus, Instant eventPublishedAt) {
         String type = "SYSTEM_NOTIFICATION".equals(message.messageType()) ? "NOTIFICATION" : "CHAT_MESSAGE";
-        String senderDisplayName = userMapper.findActiveById(message.senderId()).map(UserAccount::username).orElse(null);
+        String senderDisplayName = userMapper.findActiveById(message.senderId()).map(user -> user.displayName() == null || user.displayName().isBlank() ? user.username() : user.displayName()).orElse(null);
         boolean delivered = true;
         Collection<WebSocketSession> subscribers = sessionRegistry.sessionsForRoom(message.roomId());
         log.debug("Publishing WebSocket {} for room {} to {} subscribed session(s)",
@@ -124,7 +124,7 @@ public class RoomMessageNotifier {
     public void deliver(WebSocketSession session, ChatMessage message) {
         if (message == null || !"PUBLISHED".equals(message.status())) return;
         String type = "SYSTEM_NOTIFICATION".equals(message.messageType()) ? "NOTIFICATION" : "CHAT_MESSAGE";
-        String displayName = userMapper.findActiveById(message.senderId()).map(UserAccount::username).orElse(null);
+        String displayName = userMapper.findActiveById(message.senderId()).map(user -> user.displayName() == null || user.displayName().isBlank() ? user.username() : user.displayName()).orElse(null);
         String recipientId = sessionRegistry.userIdFor(session).orElse(null);
         if (!send(session, event(type, message, displayName, message.status(), message.publishedAt()))) {
             recordPushFailure(message, recipientId, "PUSH_REPLAY_FAILED");

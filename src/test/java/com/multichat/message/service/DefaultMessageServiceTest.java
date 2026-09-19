@@ -77,6 +77,24 @@ class DefaultMessageServiceTest {
         assertEquals(now.plusSeconds(45), result.reviewDeadlineAt());
     }
 
+    @Test
+    void disabledModerationApprovesMessageWithoutReviewQueue() {
+        DefaultMessageService service = service(List.of("blocked"), 30, false);
+        when(messageMapper.findBySenderAndRequestId(senderId, requestId)).thenReturn(Optional.empty());
+        when(userMapper.findActiveByIdForUpdate(senderId)).thenReturn(Optional.of(activeUser()));
+        when(membershipMapper.findActive(senderId, roomId)).thenReturn(Optional.of(mock(RoomMembership.class)));
+        when(rateLimiter.tryAcquire(senderId)).thenReturn(RateLimitDecision.permitted());
+        when(messageMapper.findById(any())).thenAnswer(invocation -> Optional.of(capturedMessage));
+
+        ChatMessage result = service.submit(senderId, requestId, new SubmitMessageRequest(roomId, "blocked"));
+
+        assertEquals("APPROVED", result.status());
+        assertEquals(null, result.reviewDeadlineAt());
+        verify(messageMapper).insertApprovedChat(any());
+        verify(messageMapper, never()).insertPendingChat(any());
+        verifyNoInteractions(pendingReviewIndex);
+    }
+
     private ChatMessage capturedMessage;
 
     @Test
@@ -129,11 +147,15 @@ class DefaultMessageServiceTest {
     }
 
     private DefaultMessageService service(List<String> sensitiveWords, int timeoutSeconds) {
+        return service(sensitiveWords, timeoutSeconds, true);
+    }
+
+    private DefaultMessageService service(List<String> sensitiveWords, int timeoutSeconds, boolean moderationEnabled) {
         SensitiveContentMatcher matcher = new SensitiveContentMatcher(
-                new ModerationProperties(sensitiveWords, "CONTAINS", java.time.Duration.ofSeconds(30)));
+                new ModerationProperties(moderationEnabled, sensitiveWords, "CONTAINS", java.time.Duration.ofSeconds(30)));
         DefaultMessageService service = new DefaultMessageService(messageMapper, userMapper, membershipMapper,
                 roomStatePolicy, new MessageContentValidator(), matcher, rateLimiter, pendingReviewIndex,
-                new ModerationProperties(sensitiveWords, "CONTAINS", java.time.Duration.ofSeconds(30)),
+                new ModerationProperties(moderationEnabled, sensitiveWords, "CONTAINS", java.time.Duration.ofSeconds(30)),
                 new ReviewProperties(timeoutSeconds, java.time.Duration.ofSeconds(1)), auditService,
                 Clock.fixed(now, ZoneOffset.UTC));
         doAnswer(invocation -> {
@@ -143,6 +165,13 @@ class DefaultMessageServiceTest {
                     null, null, 0, candidate.createdAt());
             return 1;
         }).when(messageMapper).insertPendingChat(any());
+        doAnswer(invocation -> {
+            ChatMessage candidate = invocation.getArgument(0);
+            capturedMessage = new ChatMessage(candidate.id(), candidate.requestId(), candidate.roomId(), candidate.senderId(),
+                    7L, null, candidate.messageType(), candidate.content(), candidate.status(), candidate.reviewDeadlineAt(),
+                    null, null, 0, candidate.createdAt());
+            return 1;
+        }).when(messageMapper).insertApprovedChat(any());
         return service;
     }
 

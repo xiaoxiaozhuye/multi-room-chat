@@ -51,8 +51,9 @@ public class DefaultAuthService implements AuthService {
     @Override
     public AuthenticationResponse register(RegisterRequest request) {
         Instant now = Instant.now();
-        UserAccount user = new UserAccount(UUID.randomUUID(), request.username().trim(), request.email().trim().toLowerCase(),
-                passwordEncoder.encode(request.password()), "USER", "ACTIVE", now, now);
+        String username = request.username().trim();
+        UserAccount user = new UserAccount(UUID.randomUUID(), username, request.email().trim().toLowerCase(),
+                passwordEncoder.encode(request.password()), "USER", "ACTIVE", now, now, username, null, 1, null);
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException exception) {
@@ -87,7 +88,8 @@ public class DefaultAuthService implements AuthService {
     }
 
     private AuthenticatedUserResponse userResponse(UserAccount user) {
-        return new AuthenticatedUserResponse(user.id(), user.username(), user.email(), List.of(user.role()), user.createdAt());
+        return new AuthenticatedUserResponse(user.id(), user.username(), user.email(), List.of(user.role()), user.createdAt(),
+                user.displayName(), user.avatarUrl(), user.level(), user.bio());
     }
 
     private BusinessException invalidCredentials() {

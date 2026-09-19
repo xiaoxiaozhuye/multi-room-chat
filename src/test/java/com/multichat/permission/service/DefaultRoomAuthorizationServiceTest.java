@@ -73,7 +73,7 @@ class DefaultRoomAuthorizationServiceTest {
 
     private ChatRoom room(UUID id) {
         Instant now = Instant.now();
-        return new ChatRoom(id, "room", null, 10, "OPEN", "ACTIVE", UUID.randomUUID(), 0, now, now);
+        return new ChatRoom(id, "room", null, 10, "OPEN", "ACTIVE", UUID.randomUUID(), 0, now, now, 0);
     }
 
     private UserAccount account(UUID id, String role) {

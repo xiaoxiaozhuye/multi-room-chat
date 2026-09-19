@@ -68,7 +68,7 @@ public class DefaultRoomService implements RoomService {
         String joinMode = enumValue(request.joinMode(), JOIN_MODES, "joinMode");
         Instant now = Instant.now();
         ChatRoom room = new ChatRoom(UUID.randomUUID(), normalizedName(request.name()), normalizeDescription(request.description()),
-                request.maxMembers(), joinMode, "ACTIVE", actorId, 0, now, now);
+                request.maxMembers(), joinMode, "ACTIVE", actorId, 0, now, now, 0);
         roomMapper.insert(room);
         auditService.append(new AuditLog(UUID.randomUUID(), null, actorId, "ROOM_CREATE", "CHAT_ROOM",
                 room.id(), room.id(), null, null, AuditStates.room(room), Map.of(), now));
@@ -128,7 +128,7 @@ public class DefaultRoomService implements RoomService {
         ChatRoom updated = new ChatRoom(current.id(), request.name() == null ? current.name() : normalizedName(request.name()),
                 request.description() == null ? current.description() : normalizeDescription(request.description()),
                 request.maxMembers() == null ? current.maxMembers() : request.maxMembers(), nextJoinMode, nextStatus,
-                current.createdBy(), current.version(), current.createdAt(), now);
+                current.createdBy(), current.version(), current.createdAt(), now, current.activeMemberCount());
         if (roomMapper.update(updated) != 1) {
             // A concurrent delete/update must be retried from the current authoritative state.
             if (roomMapper.isDeleted(roomId)) throw new BusinessException(ErrorCode.ROOM_DELETED);
@@ -136,7 +136,7 @@ public class DefaultRoomService implements RoomService {
         }
         UUID actorId = permissionService.currentActorId();
         ChatRoom persisted = new ChatRoom(updated.id(), updated.name(), updated.description(), updated.maxMembers(), updated.joinMode(),
-                updated.status(), updated.createdBy(), updated.version() + 1, updated.createdAt(), updated.updatedAt());
+                updated.status(), updated.createdBy(), updated.version() + 1, updated.createdAt(), updated.updatedAt(), updated.activeMemberCount());
         auditService.append(new AuditLog(UUID.randomUUID(), null, actorId, "ROOM_UPDATE", "CHAT_ROOM",
                 roomId, roomId, null, AuditStates.room(current), AuditStates.room(persisted), Map.of(), now));
         invalidateAfterCommit(roomId, false);

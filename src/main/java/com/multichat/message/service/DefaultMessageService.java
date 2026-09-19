@@ -37,8 +37,11 @@ public class DefaultMessageService implements MessageService {
     private final SensitiveContentMatcher sensitiveContentMatcher;
     private final UserMessageRateLimiter rateLimiter;
     private final PendingReviewIndex pendingReviewIndex;
+    private final ModerationProperties moderationProperties;
+    private final ModerationSettingsService moderationSettingsService;
     private final ReviewProperties reviewProperties;
     private final AuditService auditService;
+    private final RoomPublishService roomPublishService;
     private final Clock clock;
 
     @Autowired
@@ -47,9 +50,11 @@ public class DefaultMessageService implements MessageService {
                                  MessageContentValidator contentValidator, SensitiveContentMatcher sensitiveContentMatcher,
                                  UserMessageRateLimiter rateLimiter, PendingReviewIndex pendingReviewIndex,
                                  ModerationProperties moderationProperties, ReviewProperties reviewProperties,
-                                 AuditService auditService) {
+                                 AuditService auditService, RoomPublishService roomPublishService,
+                                 ModerationSettingsService moderationSettingsService) {
         this(messageMapper, userMapper, membershipMapper, roomStatePolicy, contentValidator, sensitiveContentMatcher,
-                rateLimiter, pendingReviewIndex, moderationProperties, reviewProperties, auditService, Clock.systemUTC());
+                rateLimiter, pendingReviewIndex, moderationProperties, reviewProperties, auditService,
+                roomPublishService, moderationSettingsService, Clock.systemUTC());
     }
 
     DefaultMessageService(MessageMapper messageMapper, UserMapper userMapper,
@@ -58,6 +63,28 @@ public class DefaultMessageService implements MessageService {
                           UserMessageRateLimiter rateLimiter, PendingReviewIndex pendingReviewIndex,
                           ModerationProperties moderationProperties, ReviewProperties reviewProperties,
                           AuditService auditService, Clock clock) {
+        this(messageMapper, userMapper, membershipMapper, roomStatePolicy, contentValidator, sensitiveContentMatcher,
+                rateLimiter, pendingReviewIndex, moderationProperties, reviewProperties, auditService, null, clock);
+    }
+
+    DefaultMessageService(MessageMapper messageMapper, UserMapper userMapper,
+                          RoomMembershipMapper membershipMapper, RoomStatePolicy roomStatePolicy,
+                          MessageContentValidator contentValidator, SensitiveContentMatcher sensitiveContentMatcher,
+                          UserMessageRateLimiter rateLimiter, PendingReviewIndex pendingReviewIndex,
+                          ModerationProperties moderationProperties, ReviewProperties reviewProperties,
+                          AuditService auditService, RoomPublishService roomPublishService, Clock clock) {
+        this(messageMapper, userMapper, membershipMapper, roomStatePolicy, contentValidator, sensitiveContentMatcher,
+                rateLimiter, pendingReviewIndex, moderationProperties, reviewProperties, auditService,
+                roomPublishService, null, clock);
+    }
+
+    DefaultMessageService(MessageMapper messageMapper, UserMapper userMapper,
+                          RoomMembershipMapper membershipMapper, RoomStatePolicy roomStatePolicy,
+                          MessageContentValidator contentValidator, SensitiveContentMatcher sensitiveContentMatcher,
+                          UserMessageRateLimiter rateLimiter, PendingReviewIndex pendingReviewIndex,
+                          ModerationProperties moderationProperties, ReviewProperties reviewProperties,
+                          AuditService auditService, RoomPublishService roomPublishService,
+                          ModerationSettingsService moderationSettingsService, Clock clock) {
         this.messageMapper = messageMapper;
         this.userMapper = userMapper;
         this.membershipMapper = membershipMapper;
@@ -66,8 +93,11 @@ public class DefaultMessageService implements MessageService {
         this.sensitiveContentMatcher = sensitiveContentMatcher;
         this.rateLimiter = rateLimiter;
         this.pendingReviewIndex = pendingReviewIndex;
+        this.moderationProperties = moderationProperties;
+        this.moderationSettingsService = moderationSettingsService;
         this.reviewProperties = reviewProperties;
         this.auditService = auditService;
+        this.roomPublishService = roomPublishService;
         this.clock = clock;
     }
 
@@ -90,11 +120,16 @@ public class DefaultMessageService implements MessageService {
         if (!decision.allowed()) throw new BusinessException(ErrorCode.MESSAGE_RATE_LIMITED);
 
         Instant createdAt = clock.instant();
+        boolean moderationEnabled = moderationEnabled(request.roomId());
         ChatMessage candidate = new ChatMessage(UUID.randomUUID(), requestId, request.roomId(), senderId, null, null,
-                "CHAT", request.content(), "PENDING_REVIEW", createdAt.plus(reviewProperties.timeout()),
+                "CHAT", request.content(), moderationEnabled ? "PENDING_REVIEW" : "APPROVED",
+                moderationEnabled ? createdAt.plus(reviewProperties.timeout()) : null,
                 null, null, 0, createdAt);
-        if (messageMapper.insertPendingChat(candidate) != 1) {
-            throw new IllegalStateException("Pending message insert did not create a row");
+        int inserted = moderationEnabled
+                ? messageMapper.insertPendingChat(candidate)
+                : messageMapper.insertApprovedChat(candidate);
+        if (inserted != 1) {
+            throw new IllegalStateException("Message insert did not create a row");
         }
         ChatMessage message = messageMapper.findById(candidate.id())
                 .orElseThrow(() -> new IllegalStateException("Inserted message is missing"));
@@ -102,7 +137,8 @@ public class DefaultMessageService implements MessageService {
         auditService.append(new AuditLog(UUID.randomUUID(), requestId, senderId, "MESSAGE_SUBMIT", "MESSAGE",
                 message.id(), message.roomId(), message.id(), null, AuditStates.message(message),
                 AuditStates.detail("messageType", message.messageType()), message.createdAt()));
-        addToReviewIndexAfterCommit(message);
+        if (moderationEnabled) addToReviewIndexAfterCommit(message);
+        else publishAfterCommit(message.roomId());
         return message;
     }
 
@@ -117,7 +153,7 @@ public class DefaultMessageService implements MessageService {
             throw new BusinessException(ErrorCode.ROOM_ACCESS_DENIED);
         }
         contentValidator.requireSendable(request.content());
-        if (sensitiveContentMatcher.matches(request.content())) {
+        if (moderationEnabled(request.roomId()) && sensitiveContentMatcher.matches(request.content())) {
             throw new BusinessException(ErrorCode.SENSITIVE_CONTENT_REJECTED);
         }
     }
@@ -130,6 +166,22 @@ public class DefaultMessageService implements MessageService {
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { write.run(); }
+        });
+    }
+
+    private boolean moderationEnabled(UUID roomId) {
+        return moderationSettingsService == null ? moderationProperties.enabled() : moderationSettingsService.isEnabled(roomId);
+    }
+
+    private void publishAfterCommit(UUID roomId) {
+        if (roomPublishService == null) return;
+        Runnable publish = () -> roomPublishService.publishAvailable(roomId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publish.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { publish.run(); }
         });
     }
 }

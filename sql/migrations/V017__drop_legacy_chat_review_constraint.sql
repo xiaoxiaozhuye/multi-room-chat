@@ -1,0 +1,1 @@
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_check6;

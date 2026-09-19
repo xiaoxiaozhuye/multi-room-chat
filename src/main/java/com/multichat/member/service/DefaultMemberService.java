@@ -11,6 +11,7 @@ import com.multichat.member.entity.RoomMembership;
 import com.multichat.permission.AdminOperation;
 import com.multichat.permission.PermissionService;
 import com.multichat.room.entity.ChatRoom;
+import com.multichat.room.service.RoomLookupService;
 import com.multichat.websocket.WebSocketSessionRegistry;
 import com.multichat.websocket.RoomMessageNotifier;
 import com.multichat.common.api.ApiError;
@@ -34,23 +35,32 @@ public class DefaultMemberService implements MemberService {
     private final PermissionService permissionService;
     private final WebSocketSessionRegistry sessionRegistry;
     private final RoomMessageNotifier roomMessageNotifier;
+    private final RoomLookupService roomLookupService;
 
     public DefaultMemberService(ChatRoomMapper roomMapper, RoomMembershipMapper membershipMapper,
                                 AuditService auditService, PermissionService permissionService,
                                 WebSocketSessionRegistry sessionRegistry) {
-        this(roomMapper, membershipMapper, auditService, permissionService, sessionRegistry, null);
+        this(roomMapper, membershipMapper, auditService, permissionService, sessionRegistry, null, null);
+    }
+
+    public DefaultMemberService(ChatRoomMapper roomMapper, RoomMembershipMapper membershipMapper,
+                                AuditService auditService, PermissionService permissionService,
+                                WebSocketSessionRegistry sessionRegistry, RoomMessageNotifier roomMessageNotifier) {
+        this(roomMapper, membershipMapper, auditService, permissionService, sessionRegistry, roomMessageNotifier, null);
     }
 
     @Autowired
     public DefaultMemberService(ChatRoomMapper roomMapper, RoomMembershipMapper membershipMapper,
                                 AuditService auditService, PermissionService permissionService,
-                                WebSocketSessionRegistry sessionRegistry, RoomMessageNotifier roomMessageNotifier) {
+                                WebSocketSessionRegistry sessionRegistry, RoomMessageNotifier roomMessageNotifier,
+                                RoomLookupService roomLookupService) {
         this.roomMapper = roomMapper;
         this.membershipMapper = membershipMapper;
         this.auditService = auditService;
         this.permissionService = permissionService;
         this.sessionRegistry = sessionRegistry;
         this.roomMessageNotifier = roomMessageNotifier;
+        this.roomLookupService = roomLookupService;
     }
 
     @Override
@@ -74,6 +84,7 @@ public class DefaultMemberService implements MemberService {
         auditService.append(new AuditLog(UUID.randomUUID(), null, userId, "JOIN_ROOM", "MEMBERSHIP",
                 membership.id(), roomId, null, null, AuditStates.membership(membership),
                 AuditStates.detail("joinMode", room.joinMode()), now));
+        invalidateRoomAfterCommit(roomId);
         return membership;
     }
 
@@ -93,6 +104,7 @@ public class DefaultMemberService implements MemberService {
         auditService.append(new AuditLog(UUID.randomUUID(), null, userId, "LEAVE_ROOM", "MEMBERSHIP",
                 active.id(), roomId, null, AuditStates.membership(active), AuditStates.membership(exited), Map.of(), now));
         unsubscribeAfterCommit(userId, roomId);
+        invalidateRoomAfterCommit(roomId);
         return exited;
     }
 
@@ -123,6 +135,7 @@ public class DefaultMemberService implements MemberService {
         auditService.append(new AuditLog(UUID.randomUUID(), null, actorId, "JOIN_APPROVE", "MEMBERSHIP",
                 membershipId, room.id(), null, AuditStates.membership(pending), AuditStates.membership(approved),
                 AuditStates.detail("applicantId", pending.userId()), now));
+        invalidateRoomAfterCommit(room.id());
         return approved;
     }
 
@@ -187,5 +200,16 @@ public class DefaultMemberService implements MemberService {
         } else {
             sessionRegistry.unsubscribeUserFromRoom(userId, roomId);
         }
+    }
+
+    private void invalidateRoomAfterCommit(UUID roomId) {
+        if (roomLookupService == null) return;
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            roomLookupService.invalidate(roomId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { roomLookupService.invalidate(roomId); }
+        });
     }
 }

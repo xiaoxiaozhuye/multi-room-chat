@@ -1,4 +1,3 @@
--- Kept in sync with the Flyway classpath migration.
 -- Development bootstrap account. Change this password before any non-development deployment.
 -- BCrypt hash for the explicitly configured default password: Admin123!
 INSERT INTO users (id, username, email, password_hash, role, status)

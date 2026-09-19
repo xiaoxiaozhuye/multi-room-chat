@@ -1,0 +1,13 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { updateProfile } from '@/api/auth'
+import { useAuthStore } from '@/stores/auth'
+const auth = useAuthStore(); const saving = ref(false)
+const form = ref({ displayName: auth.user?.displayName || auth.user?.username || '', bio: auth.user?.bio || '', avatarUrl: auth.user?.avatarUrl || '' })
+const fallback = computed(() => form.value.displayName.trim().slice(0, 1).toUpperCase() || 'U')
+function chooseAvatar(event: Event): void { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; if (!file.type.startsWith('image/')) { ElMessage.warning('请选择图片文件。'); return }; if (file.size > 1_500_000) { ElMessage.warning('头像图片不能超过 1.5MB。'); return }; const reader = new FileReader(); reader.onload = () => { form.value.avatarUrl = String(reader.result) }; reader.readAsDataURL(file) }
+async function save(): Promise<void> { if (!form.value.displayName.trim()) return; saving.value = true; try { auth.updateUser(await updateProfile({ ...form.value, displayName: form.value.displayName.trim(), bio: form.value.bio.trim() })); ElMessage.success('个人资料已保存。') } finally { saving.value = false } }
+</script>
+<template><section class="profile-page"><div class="page-heading"><div><p>完善公开资料，成员会在聊天室中看到你的昵称和头像。</p></div></div><el-card shadow="never" class="profile-card"><div class="profile-hero"><el-avatar :size="88" :src="form.avatarUrl || undefined">{{ fallback }}</el-avatar><div><h2>{{ form.displayName || '未设置昵称' }}</h2><p>等级 Lv.{{ auth.user?.level ?? 1 }}</p></div></div><el-form label-position="top" class="profile-form"><el-form-item label="头像"><input type="file" accept="image/*" @change="chooseAvatar" /><small>支持图片，最大 1.5MB。</small></el-form-item><el-form-item label="昵称" required><el-input v-model="form.displayName" maxlength="64" show-word-limit /></el-form-item><el-form-item label="个人介绍"><el-input v-model="form.bio" type="textarea" :rows="4" maxlength="240" show-word-limit placeholder="介绍一下自己吧" /></el-form-item><el-button type="primary" :loading="saving" :disabled="!form.displayName.trim()" @click="save">保存资料</el-button></el-form></el-card></section></template>
+<style scoped>.profile-page { display: grid; gap: 24px; max-width: 760px; margin: 0 auto; }.profile-card { padding: 8px; }.profile-hero { display: flex; align-items: center; gap: 20px; padding: 12px 4px 28px; border-bottom: 1px solid var(--el-border-color-lighter); }.profile-hero h2 { margin: 0 0 8px; }.profile-hero p, small { color: #667085; }.profile-form { max-width: 560px; padding-top: 26px; }.profile-form small { display: block; margin-top: 8px; }</style>

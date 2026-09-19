@@ -1,4 +1,6 @@
--- Kept in sync with src/main/resources/db/migration for operational installs.
+-- Emergency notifications are committed as PUBLISHED so they bypass the
+-- ordinary room_seq gate.  This small durable outbox records deliveries which
+-- still require an at-least-once WebSocket retry.
 CREATE TABLE emergency_notification_compensations (
     message_id UUID PRIMARY KEY REFERENCES messages(id) ON DELETE RESTRICT,
     attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),

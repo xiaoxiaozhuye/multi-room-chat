@@ -1,5 +1,5 @@
 import { request } from '@/api/http'
-import type { ChatMessage, ChatRoom, CursorPage, MemberStatus, Membership, MessageStatus, OffsetPage, RoomStatus } from '@/types/api'
+import type { ChatMessage, ChatRoom, CursorPage, MemberStatus, Membership, MessageStatus, ModerationSettings, OffsetPage, RoomStatus } from '@/types/api'
 
 function query(params: Record<string, string | number | undefined>): Record<string, string | number> {
   return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined)) as Record<string, string | number>
@@ -30,6 +30,10 @@ export async function listRooms(filters: { name?: string; roomStatus?: RoomStatu
 
 export async function getRoom(roomId: string) {
   return room(await request<any>({ method: 'get', url: `/rooms/${roomId}` }))
+}
+
+export function getRoomModeration(roomId: string) {
+  return request<ModerationSettings>({ method: 'get', url: `/rooms/${roomId}/moderation` })
 }
 
 export async function joinRoom(roomId: string) {

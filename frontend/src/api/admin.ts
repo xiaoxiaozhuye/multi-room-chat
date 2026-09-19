@@ -1,5 +1,5 @@
 import { request } from '@/api/http'
-import type { AdminRoom, AuditItem, DeliveryResult, JoinRequest, Page, ReviewMessage, RoomAuthorization, SystemMetrics } from '@/types/api'
+import type { AdminRoom, AuditItem, DeliveryResult, JoinRequest, ModerationSettings, Page, ReviewMessage, RoomAuthorization, SystemMetrics } from '@/types/api'
 
 type Params = Record<string, string | number | undefined>
 const query = (params: Params) => Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== ''))
@@ -27,4 +27,6 @@ export const adminApi = {
   revoke: (roomId: string, userId: string) => request({ method: 'delete', url: `/admin/rooms/${roomId}/authorizations/${userId}` }),
   audits: (params: Params = {}) => request<Page<AuditItem>>({ method: 'get', url: '/admin/audits', params: query(params) }),
   metrics: (window: 'CURRENT' | 'TODAY') => request<SystemMetrics>({ method: 'get', url: '/admin/system/metrics', params: { window } }),
+  roomModerationSettings: (roomId: string) => request<ModerationSettings>({ method: 'get', url: `/admin/rooms/${roomId}/moderation` }),
+  updateRoomModerationSettings: (roomId: string, enabled: boolean) => request<ModerationSettings>({ method: 'put', url: `/admin/rooms/${roomId}/moderation`, data: { enabled } }),
 }

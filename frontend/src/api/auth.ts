@@ -13,6 +13,10 @@ export function currentUser(): Promise<AuthenticatedUser> {
   return request<AuthenticatedUser>({ method: 'get', url: '/users/me' })
 }
 
+export function updateProfile(payload: Pick<AuthenticatedUser, 'displayName' | 'avatarUrl' | 'bio'>): Promise<AuthenticatedUser> {
+  return request<AuthenticatedUser>({ method: 'put', url: '/users/me/profile', data: payload })
+}
+
 export function logout(refreshToken?: string): Promise<{ loggedOut: boolean }> {
   return request({ method: 'post', url: '/auth/logout', data: { refreshToken }, skipErrorMessage: true, skipAuthRedirect: true })
 }

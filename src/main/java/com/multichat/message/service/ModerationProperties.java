@@ -7,7 +7,7 @@ import java.util.List;
 
 /** Externalized moderation policy; words are never read from Redis or the database. */
 @ConfigurationProperties(prefix = "chat.moderation")
-public record ModerationProperties(List<String> sensitiveWords, String matchMode, Duration reviewTimeout) {
+public record ModerationProperties(boolean enabled, List<String> sensitiveWords, String matchMode, Duration reviewTimeout) {
     public ModerationProperties {
         sensitiveWords = sensitiveWords == null ? List.of() : List.copyOf(sensitiveWords);
         matchMode = matchMode == null || matchMode.isBlank() ? "CONTAINS" : matchMode;

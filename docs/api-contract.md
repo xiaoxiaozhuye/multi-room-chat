@@ -311,6 +311,13 @@ REST 使用 `Authorization: Bearer <accessToken>`。登录、刷新令牌成功�
 | `GET /health` | 匿名 | 无 | `{serviceStatus:"UP"|"DEGRADED"|"DOWN", checkedAt}` | `503 SERVICE_UNAVAILABLE`（`DOWN`） |
 | `GET /admin/system/metrics` | `SYSTEM_ADMIN` | `window` 可选，`CURRENT` 或 `TODAY`，默认 `CURRENT` | `{observedAt, webSocketConnectionCount, pendingReviewCount, reviewTimeoutCountToday, messageCountToday, averageReviewLatencyMsToday, pushFailureCountToday, httpErrorRate, databasePool}` | `FORBIDDEN` |
 
+### 3.9 内容审核设置
+
+系统默认开启内容审核；Web 端不提供全局开关。聊天室可由有权限的管理员覆盖系统默认值：
+
+| `GET /admin/rooms/{roomId}/moderation` | `ROOM_ADMIN`（需有该聊天室权限）或 `SYSTEM_ADMIN` | 无 | `{enabled}` | `ROOM_ACCESS_DENIED`、`FORBIDDEN` |
+| `PUT /admin/rooms/{roomId}/moderation` | `ROOM_ADMIN`（需有该聊天室权限）或 `SYSTEM_ADMIN` | `{enabled: boolean}` | `{enabled}` | `VALIDATION_FAILED`、`ROOM_ACCESS_DENIED`、`FORBIDDEN` |
+
 监控接口只提供聚合值，不泄露用户内容、令牌或 IP。`databasePool` 为 `{active, idle, max}`；每个数值为 JSON number。
 
 ## 4. WebSocket 协议

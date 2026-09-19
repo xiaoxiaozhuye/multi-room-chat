@@ -116,6 +116,6 @@ class DefaultMemberServiceTest {
 
     private ChatRoom room(UUID roomId, String joinMode, int maxMembers) {
         Instant now = Instant.now();
-        return new ChatRoom(roomId, "Room", null, maxMembers, joinMode, "ACTIVE", UUID.randomUUID(), 0, now, now);
+        return new ChatRoom(roomId, "Room", null, maxMembers, joinMode, "ACTIVE", UUID.randomUUID(), 0, now, now, 0);
     }
 }

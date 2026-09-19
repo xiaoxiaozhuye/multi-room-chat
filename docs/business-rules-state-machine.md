@@ -134,6 +134,7 @@ PENDING_REVIEW --管理员批准--> APPROVED --轮到 next_publish_seq--> PUBLIS
 
 ### 4.1 敏感词
 
+- 内容审核系统默认开启，Web 端不提供全局开关；聊天室管理员可为有权限的聊天室设置独立开关，聊天室设置优先于系统默认值。关闭时，该聊天室的新普通 `CHAT` 消息跳过敏感词拦截和人工审核，直接以 `APPROVED` 状态进入同一房间发布序列，仍受内容格式校验、权限、限流和顺序发布约束。
 - 权威来源为部署时注入的外部化应用配置：`chat.moderation.sensitive-words`（词项）与 `chat.moderation.match-mode`（匹配规则）。本期不提供敏感词 REST 管理接口，也不以 Redis 或消息表作为词库来源。
 - 运维通过受版本控制的配置文件、环境变量或密钥配置系统更新该配置；变更经发布/滚动重启后生效。服务启动时校验并编译词库，Redis 仅可缓存编译结果，失效后必须从外部化配置重建。
 - 服务端在创建 `CHAT` 前执行检测。命中时返回统一业务错误 `SENSITIVE_CONTENT_REJECTED`，不入 `messages`、不进入审核超时索引，且不向客户端透露命中的词项或规则。`ADMIN_MESSAGE` 与 `SYSTEM_NOTIFICATION` 不经敏感词自动拦截，但均需授权且必须审计。

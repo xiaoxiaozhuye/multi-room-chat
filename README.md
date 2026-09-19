@@ -100,7 +100,7 @@ flowchart TB
 
 ## 数据库初始化
 
-初始化 SQL 文件位于 `sql/migrations` 目录；项目实际启动时由 Flyway 执行 `src/main/resources/db/migration` 目录中的同版本迁移脚本。
+所有 SQL 迁移文件统一位于 `sql/migrations` 目录；项目启动时由 Flyway 直接执行该目录中的迁移脚本。
 
 首次启动前请先在 PostgreSQL 中创建配置文件指定的数据库。项目启动后会自动执行数据库迁移，并创建所需的数据表和初始化数据，无需手动执行建表 SQL。
 

@@ -1,5 +1,7 @@
 # PostgreSQL migrations
 
+项目运行时 Flyway 使用的也是本目录，避免维护重复的迁移脚本。请从项目根目录启动应用，或通过 `spring.flyway.locations` 指定此目录的绝对路径。
+
 Run the files in `migrations/` in lexical order, once per database. They target PostgreSQL 14 or later and use `pgcrypto` for UUID defaults.
 
 ```powershell
