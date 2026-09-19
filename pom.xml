@@ -13,7 +13,7 @@
 
     <groupId>com.multichat</groupId>
     <artifactId>multi-room-chat</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0</version>
     <name>multi-room-chat</name>
     <description>Modular monolith backend for multi-room chat</description>
 
