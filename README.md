@@ -134,6 +134,70 @@ flowchart TB
 
 项目提供单一应用镜像方案：应用镜像包含 Spring Boot、Vue 构建产物和 Nginx；PostgreSQL 与 Redis 由 Compose 自动启动并使用数据卷持久化。
 
+### `docker-compose.yml`
+
+如果只分发 Compose 配置文件，可复制下面内容保存为 `docker-compose.yml`：
+
+```yaml
+services:
+  app:
+    image: ${APP_IMAGE:-xiaoxiaobobo/multi-room-chat:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT:-80}:80"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      CHAT_DB_URL: jdbc:postgresql://postgres:5432/multichat
+      CHAT_DB_USERNAME: ${POSTGRES_USER:-multichat}
+      CHAT_DB_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      CHAT_REDIS_HOST: redis
+      CHAT_REDIS_PORT: 6379
+      CHAT_REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me}
+      CHAT_JWT_SECRET: ${CHAT_JWT_SECRET:-bXVsdGktcm9vbS1jaGF0LWRvY2tlci1sb2NhbC1kZWZhdWx0LXNpZ25pbmcta2V5LTIwMjY=}
+      CHAT_WS_ALLOWED_ORIGINS: ${CHAT_WS_ALLOWED_ORIGINS:-http://localhost,http://127.0.0.1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: multichat
+      POSTGRES_USER: ${POSTGRES_USER:-multichat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change-me}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me}
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+```
+
 ### 首次启动
 
 准备 Docker Engine 和 Docker Compose 后，在包含 `docker-compose.yml` 的目录执行以下一条命令即可启动全部服务：
