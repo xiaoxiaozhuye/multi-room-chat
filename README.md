@@ -130,6 +130,51 @@ flowchart TB
 
 5. 在浏览器打开终端显示的前端地址，通常为 `http://localhost:5173`。
 
+## Docker Compose 部署
+
+项目提供单一应用镜像方案：应用镜像包含 Spring Boot、Vue 构建产物和 Nginx；PostgreSQL 与 Redis 由 Compose 自动启动并使用数据卷持久化。
+
+### 首次启动
+
+准备 Docker Engine 和 Docker Compose 后，在包含 `docker-compose.yml` 的目录执行以下一条命令即可启动全部服务：
+
+```bash
+docker compose up -d --pull always --no-build
+```
+
+该命令会自动拉取应用、PostgreSQL 和 Redis 镜像，创建网络和数据卷，并启动服务。启动后访问 `http://localhost`。
+
+### 日常启动与更新
+
+日常启动使用本地已有镜像，避免重复拉取：
+
+```bash
+docker compose up -d --no-build
+```
+
+默认使用 `latest` 标签。获取最新发布版本时无需修改配置，执行：
+
+```bash
+docker compose up -d --pull always --no-build app
+```
+
+如果需要固定运行某个版本，再在 `.env` 中指定版本标签，例如 `APP_IMAGE=xiaoxiaobobo/multi-room-chat:0.1.0`。
+
+查看运行状态和日志：
+
+```bash
+docker compose ps
+docker compose logs -f app
+```
+
+停止服务但保留数据：
+
+```bash
+docker compose down
+```
+
+生产环境请先复制 `.env.example` 为 `.env`，替换其中的数据库密码、Redis 密码、JWT 密钥和访问域名。数据库迁移由应用启动时的 Flyway 自动执行；`postgres-data` 和 `redis-data` 卷用于保存运行数据。不要使用 `docker compose down -v`，否则会删除数据卷。
+
 ## 普通用户注册
 
 在登录页面点击“还没有账号？创建账号”，填写用户名、邮箱和密码后，点击“注册并登录”即可创建普通用户账号并自动登录。

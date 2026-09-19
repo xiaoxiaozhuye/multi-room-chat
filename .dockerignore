@@ -1,0 +1,8 @@
+.git
+.idea
+target
+frontend/node_modules
+frontend/dist
+node_modules
+*.log
+docker-compose.override.yml
